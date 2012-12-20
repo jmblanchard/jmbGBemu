@@ -1,0 +1,10 @@
+jmbGBemu
+
+A Game Boy emulator created for senior cap stone project using C++.
+
+Goals
+-Fully emulated CPU and MMU systems to run most Game Boy ROMS.
+-GPU emulated.
+-Normal input through the standard D-Pad, start, select, A and B buttons will be
+emulated.
+-Sound will not be emulated.
