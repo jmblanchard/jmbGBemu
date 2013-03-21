@@ -9,7 +9,9 @@
 #include <fstream>
 #include <string>
 
-#include "Log.h"
+#include "CPU.h"
+#include "MMU.h"
+#include "definitions.h"
 
 class Emulator {
 public:
@@ -19,12 +21,9 @@ public:
     void initialize(std::string filename);
     void run();
     void shutdown();
-    void writeLog(std::string type, std::string message);
 
 private:
     std::string filename_;
-    emulog::LogFile *logFile;
-
 };
 
 #endif

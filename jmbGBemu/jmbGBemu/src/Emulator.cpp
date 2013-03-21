@@ -7,8 +7,6 @@
 
 // Take filename of ROM into emulator and begin initialization
 Emulator::Emulator() {
-    logFile = new emulog::LogFile();
-    logFile->setFile("log.txt");
 }
 
 // Destructor of emulator. Call shutdown
@@ -22,15 +20,9 @@ void Emulator::run() {
 
 // Handles cleanup of emulators systems
 void Emulator::shutdown() {
-    delete logFile;
-}
-
-// Write to log file.
-void Emulator::writeLog(std::string type, std::string message) {
-    logFile->write(type, message);
 }
 
 // Initializes the emulator
 void Emulator::initialize(std::string filename) {
-    filename = filename_;
+    filename_ = filename;
 }

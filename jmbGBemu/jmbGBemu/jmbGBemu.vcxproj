@@ -82,6 +82,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\CPU.h" />
+    <ClInclude Include="src\definitions.h" />
     <ClInclude Include="src\Emulator.h" />
     <ClInclude Include="src\Log.h" />
     <ClInclude Include="src\MMU.h" />
