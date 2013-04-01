@@ -76,6 +76,7 @@
   <ItemGroup>
     <ClCompile Include="src\CPU.cpp" />
     <ClCompile Include="src\Emulator.cpp" />
+    <ClCompile Include="src\HeaderInfo.cpp" />
     <ClCompile Include="src\Log.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MMU.cpp" />
@@ -84,6 +85,7 @@
     <ClInclude Include="src\CPU.h" />
     <ClInclude Include="src\definitions.h" />
     <ClInclude Include="src\Emulator.h" />
+    <ClInclude Include="src\HeaderInfo.h" />
     <ClInclude Include="src\Log.h" />
     <ClInclude Include="src\MMU.h" />
   </ItemGroup>

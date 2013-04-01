@@ -8,16 +8,16 @@
 #include "Emulator.h"
 
 int main(int argc, char *argv[]) {
-    Emulator *emu = new Emulator();
     // Handle command line argument issues. Currently, command line will only accept file name
     if (argc != 2) {
 		std::cout << "Incorrect number of arguments! Include filename of ROM.\n";
     }
     else {
+		Emulator *emu = new Emulator();
         emu->initialize(std::string(argv[1]));
+		delete emu;
     }
 
-    delete emu;
 
     return 0;
 }

@@ -8,201 +8,202 @@
 // Definition of both opcodes_ and cb_opcodes_
 fn CPU::opcodes_[] = {
 	// 00
-	NOP,		LD_BC_nn,		LD_pBC_A,		INC_BC,
-	INC_B,		DEC_B,			LD_B_n,			RLCA,
-	LD_pnn_SP,	ADD_HL_BC,		LD_A_pBC,		DEC_BC,
-	INC_C,		DEC_C,			LD_C_n,			RRCA,
+	&CPU::NOP,			&CPU::LD_BC_nn,		&CPU::LD_pBC_A,		&CPU::INC_BC,
+	&CPU::INC_B,		&CPU::DEC_B,		&CPU::LD_B_n,		&CPU::RLCA,
+	&CPU::LD_pnn_SP,	&CPU::ADD_HL_BC,	&CPU::LD_A_pBC,		&CPU::DEC_BC,
+	&CPU::INC_C,		&CPU::DEC_C,		&CPU::LD_C_n,		&CPU::RRCA,
 
 	// 10
-	STOP,		LD_DE_nn,		LD_pDE_A,		INC_DE,
-	INC_D,		DEC_D,			LD_D_n,			RLA,
-	JR_n,		ADD_HL_DE,		LD_A_pDE,		DEC_DE,
-	INC_E,		DEC_E,			LD_E_n,			RRA,
+	&CPU::STOP,			&CPU::LD_DE_nn,		&CPU::LD_pDE_A,		&CPU::INC_DE,
+	&CPU::INC_D,		&CPU::DEC_D,		&CPU::LD_D_n,		&CPU::RLA,
+	&CPU::JR_n,			&CPU::ADD_HL_DE,	&CPU::LD_A_pDE,		&CPU::DEC_DE,
+	&CPU::INC_E,		&CPU::DEC_E,		&CPU::LD_E_n,		&CPU::RRA,
 
 	// 20
-	JR_NZ_n,	LD_HL_nn,		LDI_pHL_A,		INC_HL,
-	INC_H,		DEC_H,			LD_H_n,			DAA,
-	JR_Z_n,		ADD_HL_HL,		LDI_A_pHL,		DEC_HL,
-	INC_L,		DEC_L,			LD_L_n,			CPL,
+	&CPU::JR_NZ_n,		&CPU::LD_HL_nn,		&CPU::LDI_pHL_A,	&CPU::INC_HL,
+	&CPU::INC_H,		&CPU::DEC_H,		&CPU::LD_H_n,		&CPU::DAA,
+	&CPU::JR_Z_n,		&CPU::ADD_HL_HL,	&CPU::LDI_A_pHL,	&CPU::DEC_HL,
+	&CPU::INC_L,		&CPU::DEC_L,		&CPU::LD_L_n,		&CPU::CPL,
 
 	// 30
-	JR_NC_n,	LD_SP_nn,		LDD_pHL_A,		INC_SP,
-	INC_pHL,	DEC_pHL,		LD_pHL_n,		SCF,
-	JR_C_n,		ADD_HL_SP,		LDD_A_pHL,		DEC_SP,
-	INC_A,		DEC_A,			LD_A_n,			CCF,
+	&CPU::JR_NC_n,		&CPU::LD_SP_nn,		&CPU::LDD_pHL_A,	&CPU::INC_SP,
+	&CPU::INC_pHL,		&CPU::DEC_pHL,		&CPU::LD_pHL_n,		&CPU::SCF,
+	&CPU::JR_C_n,		&CPU::ADD_HL_SP,	&CPU::LDD_A_pHL,	&CPU::DEC_SP,
+	&CPU::INC_A,		&CPU::DEC_A,		&CPU::LD_A_n,		&CPU::CCF,
 
 	// 40
-	LD_B_B,		LD_B_C,			LD_B_D,			LD_B_E,
-	LD_B_H,		LD_B_L,			LD_B_pHL,		LD_B_A,
-	LD_C_B,		LD_C_C,			LD_C_D,			LD_C_E,
-	LD_C_H,		LD_C_L,			LD_C_pHL,		LD_C_A,
+	&CPU::LD_B_B,		&CPU::LD_B_C,		&CPU::LD_B_D,		&CPU::LD_B_E,
+	&CPU::LD_B_H,		&CPU::LD_B_L,		&CPU::LD_B_pHL,		&CPU::LD_B_A,
+	&CPU::LD_C_B,		&CPU::LD_C_C,		&CPU::LD_C_D,		&CPU::LD_C_E,
+	&CPU::LD_C_H,		&CPU::LD_C_L,		&CPU::LD_C_pHL,		&CPU::LD_C_A,
 
 	// 50
-	LD_D_B,		LD_D_C,			LD_D_D,			LD_D_E,
-	LD_D_H,		LD_D_L,			LD_D_pHL,		LD_D_A,
-	LD_E_B,		LD_E_C,			LD_E_D,			LD_E_E,
-	LD_E_H,		LD_E_L,			LD_E_pHL,		LD_E_A,
+	&CPU::LD_D_B,		&CPU::LD_D_C,		&CPU::LD_D_D,		&CPU::LD_D_E,
+	&CPU::LD_D_H,		&CPU::LD_D_L,		&CPU::LD_D_pHL,		&CPU::LD_D_A,
+	&CPU::LD_E_B,		&CPU::LD_E_C,		&CPU::LD_E_D,		&CPU::LD_E_E,
+	&CPU::LD_E_H,		&CPU::LD_E_L,		&CPU::LD_E_pHL,		&CPU::LD_E_A,
 
 	// 60
-	LD_H_B,		LD_H_C,			LD_H_D,			LD_H_E,
-	LD_H_H,		LD_H_L,			LD_H_pHL,		LD_H_A,
-	LD_L_B,		LD_L_C,			LD_L_D,			LD_L_E,
-	LD_L_H,		LD_L_L,			LD_L_pHL,		LD_L_A,
+	&CPU::LD_H_B,		&CPU::LD_H_C,		&CPU::LD_H_D,		&CPU::LD_H_E,
+	&CPU::LD_H_H,		&CPU::LD_H_L,		&CPU::LD_H_pHL,		&CPU::LD_H_A,
+	&CPU::LD_L_B,		&CPU::LD_L_C,		&CPU::LD_L_D,		&CPU::LD_L_E,
+	&CPU::LD_L_H,		&CPU::LD_L_L,		&CPU::LD_L_pHL,		&CPU::LD_L_A,
 
 	// 70
-	LD_pHL_B,	LD_pHL_C,		LD_pHL_D,		LD_pHL_E,
-	LD_pHL_H,	LD_pHL_L,		HALT,			LD_pHL_A,
-	LD_A_B,		LD_A_C,			LD_A_D,			LD_A_E,
-	LD_A_H,		LD_A_L,			LD_A_pHL,		LD_A_A,
+	&CPU::LD_pHL_B,		&CPU::LD_pHL_C,		&CPU::LD_pHL_D,		&CPU::LD_pHL_E,
+	&CPU::LD_pHL_H,		&CPU::LD_pHL_L,		&CPU::HALT,			&CPU::LD_pHL_A,
+	&CPU::LD_A_B,		&CPU::LD_A_C,		&CPU::LD_A_D,		&CPU::LD_A_E,
+	&CPU::LD_A_H,		&CPU::LD_A_L,		&CPU::LD_A_pHL,		&CPU::LD_A_A,
 
 	// 80
-	ADD_A_B,	ADD_A_C,		ADD_A_D,		ADD_A_E,
-	ADD_A_H,	ADD_A_L,		ADD_A_pHL,		ADD_A_A,
-	ADC_A_B,	ADC_A_C,		ADC_A_D,		ADC_A_E,
-	ADC_A_H,	ADC_A_L,		ADC_A_pHL,		ADC_A_A,
+	&CPU::ADD_A_B,		&CPU::ADD_A_C,		&CPU::ADD_A_D,		&CPU::ADD_A_E,
+	&CPU::ADD_A_H,		&CPU::ADD_A_L,		&CPU::ADD_A_pHL,	&CPU::ADD_A_A,
+	&CPU::ADC_A_B,		&CPU::ADC_A_C,		&CPU::ADC_A_D,		&CPU::ADC_A_E,
+	&CPU::ADC_A_H,		&CPU::ADC_A_L,		&CPU::ADC_A_pHL,	&CPU::ADC_A_A,
 
 	// 90
-	SUB_B,		SUB_C,			SUB_D,			SUB_E,
-	SUB_H,		SUB_L,			SUB_pHL,		SUB_A,
-	SBC_A_B,	SBC_A_C,		SBC_A_D,		SBC_A_E,
-	SBC_A_H,	SBC_A_L,		SBC_A_pHL,		SBC_A_A,
+	&CPU::SUB_B,		&CPU::SUB_C,		&CPU::SUB_D,		&CPU::SUB_E,
+	&CPU::SUB_H,		&CPU::SUB_L,		&CPU::SUB_pHL,		&CPU::SUB_A,
+	&CPU::SBC_A_B,		&CPU::SBC_A_C,		&CPU::SBC_A_D,		&CPU::SBC_A_E,
+	&CPU::SBC_A_H,		&CPU::SBC_A_L,		&CPU::SBC_A_pHL,	&CPU::SBC_A_A,
 
 	// A0
-	AND_B,		AND_C,			AND_D,			AND_E,
-	AND_H,		AND_L,			AND_pHL,		AND_A,
-	XOR_B,		XOR_C,			XOR_D,			XOR_E,
-	XOR_H,		XOR_L,			XOR_pHL,		XOR_A,
+	&CPU::AND_B,		&CPU::AND_C,		&CPU::AND_D,		&CPU::AND_E,
+	&CPU::AND_H,		&CPU::AND_L,		&CPU::AND_pHL,		&CPU::AND_A,
+	&CPU::XOR_B,		&CPU::XOR_C,		&CPU::XOR_D,		&CPU::XOR_E,
+	&CPU::XOR_H,		&CPU::XOR_L,		&CPU::XOR_pHL,		&CPU::XOR_A,
 
 	// B0
-	OR_B,		OR_C,			OR_D,			OR_E,
-	OR_H,		OR_L,			OR_pHL,			OR_A,
-	CP_B,		CP_C,			CP_D,			CP_E,
-	CP_H,		CP_L,			CL_pHL,			CP_A,
+	&CPU::OR_B,			&CPU::OR_C,			&CPU::OR_D,			&CPU::OR_E,
+	&CPU::OR_H,			&CPU::OR_L,			&CPU::OR_pHL,		&CPU::OR_A,
+	&CPU::CP_B,			&CPU::CP_C,			&CPU::CP_D,			&CPU::CP_E,
+	&CPU::CP_H,			&CPU::CP_L,			&CPU::CL_pHL,		&CPU::CP_A,
 	
 	// C0
-	RET_NZ,		POP_BC,			JP_NZ_pnn,		JP_pnn,
-	CALL_NZ_pnn,PUSH_BC,		ADD_A_n,		RST_00H,
-	RET_Z,		RET,			JP_Z_pnn,		PREFIX_CB,
-	CALL_Z_pnn,	CALL_pnn,		ADC_A_n,		RST_08H,
+	&CPU::RET_NZ,		&CPU::POP_BC,		&CPU::JP_NZ_pnn,	&CPU::JP_pnn,
+	&CPU::CALL_NZ_pnn,	&CPU::PUSH_BC,		&CPU::ADD_A_n,		&CPU::RST_00H,
+	&CPU::RET_Z,		&CPU::RET,			&CPU::JP_Z_pnn,		&CPU::PREFIX_CB,
+	&CPU::CALL_Z_pnn,	&CPU::CALL_pnn,		&CPU::ADC_A_n,		&CPU::RST_08H,
 
 	// D0
-	RET_NC,		POP_DE,			JP_NC_pnn,		XX,
-	CALL_NC_pnn,PUSH_DE,		SUB_n,			RST_10H,
-	RET_C,		RETI,			JP_C_pnn,		XX,
-	CALL_C_pnn,	XX,				SBC_A_n,		RST_18H,
+	&CPU::RET_NC,		&CPU::POP_DE,		&CPU::JP_NC_pnn,	&CPU::XX,
+	&CPU::CALL_NC_pnn,	&CPU::PUSH_DE,		&CPU::SUB_n,		&CPU::RST_10H,
+	&CPU::RET_C,		&CPU::RETI,			&CPU::JP_C_pnn,		&CPU::XX,
+	&CPU::CALL_C_pnn,	&CPU::XX,			&CPU::SBC_A_n,		&CPU::RST_18H,
 
 	// E0
-	LDH_pnn_A,	POP_HL,			LD_pC_A,		XX,
-	XX,			PUSH_HL,		AND_n,			RST_20H,
-	ADD_SP_n,	JP_pHL,			LD_pnn_A,		XX,
-	XX,			XX,				XOR_n,			RST_28H,
+	&CPU::LDH_pnn_A,	&CPU::POP_HL,		&CPU::LD_pC_A,		&CPU::XX,
+	&CPU::XX,			&CPU::PUSH_HL,		&CPU::AND_n,		&CPU::RST_20H,
+	&CPU::ADD_SP_n,		&CPU::JP_pHL,		&CPU::LD_pnn_A,		&CPU::XX,
+	&CPU::XX,			&CPU::XX,			&CPU::XOR_n,		&CPU::RST_28H,
 
 	// F0
-	LDH_A_pnn,	POP_AF,			LD_A_pC,		DI,
-	XX,			PUSH_AF,		OR_n,			RST_30H,
-	LDHL_SP_n,	LD_SP_HL,		LD_A_pnn,		EI,
-	XX,			XX,				CP_n,			RST_38H
+	&CPU::LDH_A_pnn,	&CPU::POP_AF,		&CPU::LD_A_pC,		&CPU::DI,
+	&CPU::XX,			&CPU::PUSH_AF,		&CPU::OR_n,			&CPU::RST_30H,
+	&CPU::LDHL_SP_n,	&CPU::LD_SP_HL,		&CPU::LD_A_pnn,		&CPU::EI,
+	&CPU::XX,			&CPU::XX,			&CPU::CP_n,			&CPU::RST_38H
 };
 
 fn CPU::cb_opcodes_[] = {
 	// 00
-	RLC_B,		RLC_C,			RLC_D,			RLC_E,
-	RLC_H,		RLC_L,			RLC_pHL,		RLC_A,
-	RRC_B,		RRC_C,			RRC_D,			RRC_E,
-	RRC_H,		RRC_L,			RRC_pHL,		RRC_A,
+	&CPU::RLC_B,		&CPU::RLC_C,		&CPU::RLC_D,		&CPU::RLC_E,
+	&CPU::RLC_H,		&CPU::RLC_L,		&CPU::RLC_pHL,		&CPU::RLC_A,
+	&CPU::RRC_B,		&CPU::RRC_C,		&CPU::RRC_D,		&CPU::RRC_E,
+	&CPU::RRC_H,		&CPU::RRC_L,		&CPU::RRC_pHL,		&CPU::RRC_A,
 
 	// 10
-	RL_B,		RL_C,			RL_D,			RL_E,
-	RL_H,		RL_L,			RL_pHL,			RL_A,
-	RR_B,		RR_C,			RR_D,			RR_E,
-	RR_H,		RR_L,			RR_pHL,			RR_A,
+	&CPU::RL_B,			&CPU::RL_C,			&CPU::RL_D,			&CPU::RL_E,
+	&CPU::RL_H,			&CPU::RL_L,			&CPU::RL_pHL,		&CPU::RL_A,
+	&CPU::RR_B,			&CPU::RR_C,			&CPU::RR_D,			&CPU::RR_E,
+	&CPU::RR_H,			&CPU::RR_L,			&CPU::RR_pHL,		&CPU::RR_A,
 
 	// 20
-	SLA_B,		SLA_C,			SLA_D,			SLA_E,
-	SLA_H,		SLA_L,			SLA_pHL,		SLA_A,
-	SRA_B,		SRA_C,			SRA_D,			SRA_E,
-	SRA_H,		SRA_L,			SRA_pHL,		SRA_A,
+	&CPU::SLA_B,		&CPU::SLA_C,		&CPU::SLA_D,		&CPU::SLA_E,
+	&CPU::SLA_H,		&CPU::SLA_L,		&CPU::SLA_pHL,		&CPU::SLA_A,
+	&CPU::SRA_B,		&CPU::SRA_C,		&CPU::SRA_D,		&CPU::SRA_E,
+	&CPU::SRA_H,		&CPU::SRA_L,		&CPU::SRA_pHL,		&CPU::SRA_A,
 
 	// 30
-	SWAP_B,		SWAP_C,			SWAP_D,			SWAP_E,
-	SWAP_H,		SWAP_L,			SWAP_pHL,		SWAP_A,
-	SRL_B,		SRL_C,			SRL_D,			SRL_E,
-	SRL_H,		SRL_L,			SRL_pHL,		SRL_A,
+	&CPU::SWAP_B,		&CPU::SWAP_C,		&CPU::SWAP_D,		&CPU::SWAP_E,
+	&CPU::SWAP_H,		&CPU::SWAP_L,		&CPU::SWAP_pHL,		&CPU::SWAP_A,
+	&CPU::SRL_B,		&CPU::SRL_C,		&CPU::SRL_D,		&CPU::SRL_E,
+	&CPU::SRL_H,		&CPU::SRL_L,		&CPU::SRL_pHL,		&CPU::SRL_A,
 
 	// 40
-	BIT_0_B,	BIT_0_C,		BIT_0_D,		BIT_0_E,
-	BIT_0_H,	BIT_0_L,		BIT_0_pHL,		BIT_0_A,
-	BIT_1_B,	BIT_1_C,		BIT_1_D,		BIT_1_E,
-	BIT_1_H,	BIT_1_L,		BIT_1_pHL,		BIT_1_A,
+	&CPU::BIT_0_B,		&CPU::BIT_0_C,		&CPU::BIT_0_D,		&CPU::BIT_0_E,
+	&CPU::BIT_0_H,		&CPU::BIT_0_L,		&CPU::BIT_0_pHL,	&CPU::BIT_0_A,
+	&CPU::BIT_1_B,		&CPU::BIT_1_C,		&CPU::BIT_1_D,		&CPU::BIT_1_E,
+	&CPU::BIT_1_H,		&CPU::BIT_1_L,		&CPU::BIT_1_pHL,	&CPU::BIT_1_A,
 
 	// 50
-	BIT_2_B,	BIT_2_C,		BIT_2_D,		BIT_2_E,
-	BIT_2_H,	BIT_2_L,		BIT_2_pHL,		BIT_2_A,
-	BIT_3_B,	BIT_3_C,		BIT_3_D,		BIT_3_E,
-	BIT_3_H,	BIT_3_L,		BIT_3_pHL,		BIT_3_A,
+	&CPU::BIT_2_B,		&CPU::BIT_2_C,		&CPU::BIT_2_D,		&CPU::BIT_2_E,
+	&CPU::BIT_2_H,		&CPU::BIT_2_L,		&CPU::BIT_2_pHL,	&CPU::BIT_2_A,
+	&CPU::BIT_3_B,		&CPU::BIT_3_C,		&CPU::BIT_3_D,		&CPU::BIT_3_E,
+	&CPU::BIT_3_H,		&CPU::BIT_3_L,		&CPU::BIT_3_pHL,	&CPU::BIT_3_A,
 
 	// 60
-	BIT_4_B,	BIT_4_C,		BIT_4_D,		BIT_4_E,
-	BIT_4_H,	BIT_4_L,		BIT_4_pHL,		BIT_4_A,
-	BIT_5_B,	BIT_5_C,		BIT_5_D,		BIT_5_E,
-	BIT_5_H,	BIT_5_L,		BIT_5_pHL,		BIT_5_A,
+	&CPU::BIT_4_B,		&CPU::BIT_4_C,		&CPU::BIT_4_D,		&CPU::BIT_4_E,
+	&CPU::BIT_4_H,		&CPU::BIT_4_L,		&CPU::BIT_4_pHL,	&CPU::BIT_4_A,
+	&CPU::BIT_5_B,		&CPU::BIT_5_C,		&CPU::BIT_5_D,		&CPU::BIT_5_E,
+	&CPU::BIT_5_H,		&CPU::BIT_5_L,		&CPU::BIT_5_pHL,	&CPU::BIT_5_A,
 
 	// 70
-	BIT_6_B,	BIT_6_C,		BIT_6_D,		BIT_6_E,
-	BIT_6_H,	BIT_6_L,		BIT_6_pHL,		BIT_6_A,
-	BIT_7_B,	BIT_7_C,		BIT_7_D,		BIT_7_E,
-	BIT_7_H,	BIT_7_L,		BIT_7_pHL,		BIT_7_A,
+	&CPU::BIT_6_B,		&CPU::BIT_6_C,		&CPU::BIT_6_D,		&CPU::BIT_6_E,
+	&CPU::BIT_6_H,		&CPU::BIT_6_L,		&CPU::BIT_6_pHL,	&CPU::BIT_6_A,
+	&CPU::BIT_7_B,		&CPU::BIT_7_C,		&CPU::BIT_7_D,		&CPU::BIT_7_E,
+	&CPU::BIT_7_H,		&CPU::BIT_7_L,		&CPU::BIT_7_pHL,	&CPU::BIT_7_A,
 
 	// 80
-	RES_0_B,	RES_0_C,		RES_0_D,		RES_0_E,
-	RES_0_H,	RES_0_L,		RES_0_pHL,		RES_0_A,
-	RES_1_B,	RES_1_C,		RES_1_D,		RES_1_E,
-	RES_1_H,	RES_1_L,		RES_1_pHL,		RES_1_A,
+	&CPU::RES_0_B,		&CPU::RES_0_C,		&CPU::RES_0_D,		&CPU::RES_0_E,
+	&CPU::RES_0_H,		&CPU::RES_0_L,		&CPU::RES_0_pHL,	&CPU::RES_0_A,
+	&CPU::RES_1_B,		&CPU::RES_1_C,		&CPU::RES_1_D,		&CPU::RES_1_E,
+	&CPU::RES_1_H,		&CPU::RES_1_L,		&CPU::RES_1_pHL,	&CPU::RES_1_A,
 
 	// 90
-	RES_2_B,	RES_2_C,		RES_2_D,		RES_2_E,
-	RES_2_H,	RES_2_L,		RES_2_pHL,		RES_2_A,
-	RES_3_B,	RES_3_C,		RES_3_D,		RES_3_E,
-	RES_3_H,	RES_3_L,		RES_3_pHL,		RES_3_A,
+	&CPU::RES_2_B,		&CPU::RES_2_C,		&CPU::RES_2_D,		&CPU::RES_2_E,
+	&CPU::RES_2_H,		&CPU::RES_2_L,		&CPU::RES_2_pHL,	&CPU::RES_2_A,
+	&CPU::RES_3_B,		&CPU::RES_3_C,		&CPU::RES_3_D,		&CPU::RES_3_E,
+	&CPU::RES_3_H,		&CPU::RES_3_L,		&CPU::RES_3_pHL,	&CPU::RES_3_A,
 
 	// A0
-	RES_4_B,	RES_4_C,		RES_4_D,		RES_4_E,
-	RES_4_H,	RES_4_L,		RES_4_pHL,		RES_4_A,
-	RES_5_B,	RES_5_C,		RES_5_D,		RES_5_E,
-	RES_5_H,	RES_5_L,		RES_5_pHL,		RES_5_A,
+	&CPU::RES_4_B,		&CPU::RES_4_C,		&CPU::RES_4_D,		&CPU::RES_4_E,
+	&CPU::RES_4_H,		&CPU::RES_4_L,		&CPU::RES_4_pHL,	&CPU::RES_4_A,
+	&CPU::RES_5_B,		&CPU::RES_5_C,		&CPU::RES_5_D,		&CPU::RES_5_E,
+	&CPU::RES_5_H,		&CPU::RES_5_L,		&CPU::RES_5_pHL,	&CPU::RES_5_A,
 
 	// B0
-	RES_6_B,	RES_6_C,		RES_6_D,		RES_6_E,
-	RES_6_H,	RES_6_L,		RES_6_pHL,		RES_6_A,
-	RES_7_B,	RES_7_C,		RES_7_D,		RES_7_E,
-	RES_7_H,	RES_7_L,		RES_7_pHL,		RES_7_A,
+	&CPU::RES_6_B,		&CPU::RES_6_C,		&CPU::RES_6_D,		&CPU::RES_6_E,
+	&CPU::RES_6_H,		&CPU::RES_6_L,		&CPU::RES_6_pHL,	&CPU::RES_6_A,
+	&CPU::RES_7_B,		&CPU::RES_7_C,		&CPU::RES_7_D,		&CPU::RES_7_E,
+	&CPU::RES_7_H,		&CPU::RES_7_L,		&CPU::RES_7_pHL,	&CPU::RES_7_A,
 
 	// C0
-	SET_0_B,	SET_0_C,		SET_0_D,		SET_0_E,
-	SET_0_H,	SET_0_L,		SET_0_pHL,		SET_0_A,
-	SET_1_B,	SET_1_C,		SET_1_D,		SET_1_E,
-	SET_1_H,	SET_1_L,		SET_1_pHL,		SET_1_A,
+	&CPU::SET_0_B,		&CPU::SET_0_C,		&CPU::SET_0_D,		&CPU::SET_0_E,
+	&CPU::SET_0_H,		&CPU::SET_0_L,		&CPU::SET_0_pHL,	&CPU::SET_0_A,
+	&CPU::SET_1_B,		&CPU::SET_1_C,		&CPU::SET_1_D,		&CPU::SET_1_E,
+	&CPU::SET_1_H,		&CPU::SET_1_L,		&CPU::SET_1_pHL,	&CPU::SET_1_A,
 
 	// D0
-	SET_2_B,	SET_2_C,		SET_2_D,		SET_2_E,
-	SET_2_H,	SET_2_L,		SET_2_pHL,		SET_2_A,
-	SET_3_B,	SET_3_C,		SET_3_D,		SET_3_E,
-	SET_3_H,	SET_3_L,		SET_3_pHL,		SET_3_A,
+	&CPU::SET_2_B,		&CPU::SET_2_C,		&CPU::SET_2_D,		&CPU::SET_2_E,
+	&CPU::SET_2_H,		&CPU::SET_2_L,		&CPU::SET_2_pHL,	&CPU::SET_2_A,
+	&CPU::SET_3_B,		&CPU::SET_3_C,		&CPU::SET_3_D,		&CPU::SET_3_E,
+	&CPU::SET_3_H,		&CPU::SET_3_L,		&CPU::SET_3_pHL,	&CPU::SET_3_A,
 
 	// E0
-	SET_4_B,	SET_4_C,		SET_4_D,		SET_4_E,
-	SET_4_H,	SET_4_L,		SET_4_pHL,		SET_4_A,
-	SET_5_B,	SET_5_C,		SET_5_D,		SET_5_E,
-	SET_5_H,	SET_5_L,		SET_5_pHL,		SET_5_A,
+	&CPU::SET_4_B,		&CPU::SET_4_C,		&CPU::SET_4_D,		&CPU::SET_4_E,
+	&CPU::SET_4_H,		&CPU::SET_4_L,		&CPU::SET_4_pHL,	&CPU::SET_4_A,
+	&CPU::SET_5_B,		&CPU::SET_5_C,		&CPU::SET_5_D,		&CPU::SET_5_E,
+	&CPU::SET_5_H,		&CPU::SET_5_L,		&CPU::SET_5_pHL,	&CPU::SET_5_A,
 
 	// F0
-	SET_6_B,	SET_6_C,		SET_6_D,		SET_6_E,
-	SET_6_H,	SET_6_L,		SET_6_pHL,		SET_6_A,
-	SET_7_B,	SET_7_C,		SET_7_D,		SET_7_E,
-	SET_7_H,	SET_7_L,		SET_7_pHL,		SET_7_A
+	&CPU::SET_6_B,		&CPU::SET_6_C,		&CPU::SET_6_D,		&CPU::SET_6_E,
+	&CPU::SET_6_H,		&CPU::SET_6_L,		&CPU::SET_6_pHL,	&CPU::SET_6_A,
+	&CPU::SET_7_B,		&CPU::SET_7_C,		&CPU::SET_7_D,		&CPU::SET_7_E,
+	&CPU::SET_7_H,		&CPU::SET_7_L,		&CPU::SET_7_pHL,	&CPU::SET_7_A
 };
 
-CPU::CPU(MMU *mmu) {
+CPU::CPU(MMU *mmu, HeaderInfo *hi) {
+	hi_ = hi;
 	mmu_ = mmu;
 	A_ = B_ = C_ = D_ = F_ = H_ = L_ = 0;
 	SP_ = 0xFFFE;
@@ -210,6 +211,8 @@ CPU::CPU(MMU *mmu) {
 }
 
 CPU::~CPU() { }
+
+void CPU::run() { }
 
 // Opcode functions.
 void CPU::XX() {

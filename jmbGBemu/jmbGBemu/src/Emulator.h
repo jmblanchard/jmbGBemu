@@ -6,12 +6,12 @@
 #ifndef _EMULATOR_H
 #define _EMULATOR_H
 
-#include <fstream>
 #include <string>
 
+#include "definitions.h"
+#include "HeaderInfo.h"
 #include "CPU.h"
 #include "MMU.h"
-#include "definitions.h"
 
 class Emulator {
 public:
@@ -22,8 +22,19 @@ public:
     void run();
     void shutdown();
 
+	void setRunning(bool b);
+
 private:
     std::string filename_;
+	CPU *cpu_;
+	MMU *mmu_;
+	HeaderInfo *hi_;
+
+	bool running_;
+
+	int current_clocks_;
+	int clocks_until_next_mode_;
+	Mode current_mode_;
 };
 
 #endif

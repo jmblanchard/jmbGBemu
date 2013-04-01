@@ -6,15 +6,19 @@
 #ifndef _CPU_H
 #define _CPU_H
 
-#include "MMU.h"
 #include "definitions.h"
+#include "HeaderInfo.h"
+#include "MMU.h"
 
 class CPU {
 public:
-	CPU(MMU *mmu);
+	CPU(MMU *mmu, HeaderInfo *hi);
 	~CPU();
 
+	void run();
+
 private:
+	HeaderInfo *hi_;
 	MMU *mmu_; // memory object
 
 	// Registers
