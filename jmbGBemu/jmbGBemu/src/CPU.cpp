@@ -202,309 +202,3013 @@ fn CPU::cb_opcodes_[] = {
 	&CPU::SET_7_H,		&CPU::SET_7_L,		&CPU::SET_7_pHL,	&CPU::SET_7_A
 };
 
-CPU::CPU(MMU *mmu, HeaderInfo *hi) {
+CPU::CPU(MMU *mmu, Emulator *emu, HeaderInfo *hi) {
 	hi_ = hi;
+	emu_ = emu;
 	mmu_ = mmu;
 	A_ = B_ = C_ = D_ = F_ = H_ = L_ = 0;
 	SP_ = 0xFFFE;
 	PC_ = 0x100;
+	cycles_done_ = 0;
 }
 
 CPU::~CPU() { }
 
-void CPU::run() { }
+void CPU::handleInterrupts() {
+}
+
+int CPU::run() {
+	// fetch
+	if (!halted_) {
+		BYTE curr_op;
+		mmu_->readByte(PC_++, curr_op);
+
+		// decode and execute
+		opcodes_[curr_op];
+
+		return cycles_done_;
+	} else {
+		return 0;
+	}
+}
 
 // Opcode functions.
 void CPU::XX() {
 }
 
 // 00
-void CPU::NOP(){ }
-void CPU::LD_BC_nn(){ }
-void CPU::LD_pBC_A(){ }
-void CPU::INC_BC(){ }
-void CPU::INC_B(){ }
-void CPU::DEC_B(){ }
-void CPU::LD_B_n(){ }
-void CPU::RLCA(){ }
-void CPU::LD_pnn_SP(){ }
-void CPU::ADD_HL_BC(){ }
-void CPU::LD_A_pBC(){ }
-void CPU::DEC_BC(){ }
-void CPU::INC_C(){ }
-void CPU::DEC_C(){ }
-void CPU::LD_C_n(){ }
-void CPU::RRCA(){ }
+void CPU::NOP(){
+	cycles_done_ = 4;
+}
+
+void CPU::LD_BC_nn(){
+	WORD temp;
+	mmu_->readWord(PC_, temp);
+	B_ = (temp >> 8) & 0xFF;
+	C_ = temp&0xFF;
+	PC_+=2;
+
+	cycles_done_ = 12;
+}
+
+void CPU::LD_pBC_A(){
+	WORD address = (B_ << 8) | C_;
+	mmu_->writeByte(address, A_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::INC_BC(){
+	C_ += 0x01;
+	if (!C_)
+		B_ += 0x01;
+
+	cycles_done_ = 8;
+}
+
+void CPU::INC_B(){
+	BYTE temp = B_ + 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ &= !(0x40); // reset N flag
+	if ((B_&0x0F + 0x01)&0x10)
+		F_ |= 0x20; // half carry flag
+
+	B_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::DEC_B(){
+	BYTE temp = B_ - 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ |= 0x40; // set N flag
+	if ((B_&0x0F - 0x01) >= 0x0F)
+		F_ |= 0x20; // half carry flag
+
+	B_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_B_n(){
+	mmu_->readByte(PC_++, B_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RLCA(){
+	BYTE newCarry = (A_ & 0x80) >> 3;
+	BYTE oldCarry = (F_ & 0x10) >> 4;
+	A_ = A_ << 1;
+	if (oldCarry)
+		A_ |= oldCarry;
+	else
+		A_ &= !(oldCarry);
+
+	if (newCarry)
+		F_ |= newCarry;
+	else
+		F_ &= !(newCarry);
+
+	F_ &= !(0xE0); // reset other flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_pnn_SP(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_+=2;
+
+	mmu_->writeWord(address, SP_);
+
+	cycles_done_ = 20;
+}
+
+void CPU::ADD_HL_BC(){
+	WORD hl = (H_ << 8) | L_;
+	WORD bc = (B_ << 8) | C_;
+	WORD sum = hl + bc;
+
+	// did we have a carry?
+	if (sum < hl && sum < bc)
+		F_ |= 0x10;
+	F_ &= !(0x40); // reset N
+	// not implementing H flag
+	H_ = sum >> 8;
+	L_ = sum & 0xFF;
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_A_pBC(){
+	WORD address = (B_ << 8) | C_;
+	mmu_->readByte(address, A_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::DEC_BC(){
+	WORD w = (B_ << 8) | C_;
+	w--;
+	B_ = w >> 8;
+	C_ = w & 0xFF;
+
+	cycles_done_ = 8;
+}
+
+void CPU::INC_C(){
+	BYTE temp = C_ + 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ &= !(0x40); // reset N flag
+	if ((C_&0x0F + 0x01)&0x10)
+		F_ |= 0x20; // half carry flag
+
+	C_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::DEC_C(){
+	BYTE temp = C_ - 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ |= 0x40; // set N flag
+	if ((C_&0x0F - 0x01) >= 0x0F)
+		F_ |= 0x20; // half carry flag
+
+	C_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_C_n(){
+	mmu_->readByte(PC_++, C_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RRCA(){
+	BYTE newCarry = A_ & 0x01;
+	BYTE oldCarry = F_ & 0x10;
+	A_ = A_ >> 1;
+
+	if (oldCarry)
+		A_ |= 0x80;
+	else
+		A_ &= !(0x80);
+
+	if (newCarry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0xE0); // reset other flags
+
+	cycles_done_ = 4;
+}
 
 // 10
-void CPU::STOP(){ }
-void CPU::LD_DE_nn(){ }
-void CPU::LD_pDE_A(){ }
-void CPU::INC_DE(){ }
-void CPU::INC_D(){ }
-void CPU::DEC_D(){ }
-void CPU::LD_D_n(){ }
-void CPU::RLA(){ }
-void CPU::JR_n(){ }
-void CPU::ADD_HL_DE(){ }
-void CPU::LD_A_pDE(){ }
-void CPU::DEC_DE(){ }
-void CPU::INC_E(){ }
-void CPU::DEC_E(){ }
-void CPU::LD_E_n(){ }
-void CPU::RRA(){ }
+void CPU::STOP(){
+	// not implementing this unless absolutely necessary
+}
+
+void CPU::LD_DE_nn(){
+	WORD temp;
+	mmu_->readWord(PC_, temp);
+	D_ = (temp >> 8) & 0xFF;
+	E_ = temp&0xFF;
+	PC_+=2;
+
+	cycles_done_ = 12;
+}
+
+void CPU::LD_pDE_A(){
+	WORD address = (D_ << 8) | E_;
+	mmu_->writeByte(address, A_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::INC_DE(){
+	E_ += 0x01;
+	if (!E_)
+		D_ += 0x01;
+
+	cycles_done_ = 8;
+}
+
+void CPU::INC_D(){
+	BYTE temp = D_ + 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ &= !(0x40); // reset N flag
+	if ((D_&0x0F + 0x01)&0x10)
+		F_ |= 0x20; // half carry flag
+
+	D_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::DEC_D(){
+	BYTE temp = D_ - 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ |= 0x40; // set N flag
+	if ((D_&0x0F - 0x01) >= 0x0F)
+		F_ |= 0x20; // half carry flag
+
+	D_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_D_n(){
+	mmu_->readByte(PC_++, D_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RLA(){
+	BYTE newCarry = (A_ & 0x80) >> 3;
+	A_ = A_ << 1;
+
+	if (newCarry) {
+		A_ |= newCarry >> 4;
+		F_ |= newCarry;
+	} else {
+		A_ &= !(newCarry >> 4);
+		F_ &= !(newCarry);
+	}
+
+	F_ &= !(0xE0); // reset other flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::JR_n(){
+	BYTE n; int8_t m=0;
+	mmu_->readByte(PC_++, n);
+	m |= n;
+	PC_ += m;
+
+	cycles_done_ = 12;
+}
+
+void CPU::ADD_HL_DE(){
+	WORD hl = (H_ << 8) | L_;
+	WORD de = (D_ << 8) | E_;
+	WORD sum = hl + de;
+
+	// did we have a carry?
+	if (sum < hl && sum < de)
+		F_ |= 0x10;
+	F_ &= !(0x40); // reset N
+	// not implementing H flag
+	H_ = sum >> 8;
+	L_ = sum & 0xFF;
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_A_pDE(){
+	WORD address = (D_ << 8) | E_;
+	mmu_->readByte(address, A_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::DEC_DE(){
+	WORD w = (D_ << 8) | E_;
+	w--;
+	D_ = w >> 8;
+	E_ = w & 0xFF;
+
+	cycles_done_ = 8;
+}
+
+void CPU::INC_E(){
+	BYTE temp = E_ + 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ &= !(0x40); // reset N flag
+	if ((E_&0x0F + 0x01)&0x10)
+		F_ |= 0x20; // half carry flag
+
+	E_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::DEC_E(){
+	BYTE temp = E_ - 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ |= 0x40; // set N flag
+	if ((E_&0x0F - 0x01) >= 0x0F)
+		F_ |= 0x20; // half carry flag
+
+	E_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_E_n(){
+	mmu_->readByte(PC_++, E_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RRA(){
+	BYTE newCarry = A_ & 0x01;
+	A_ = A_ >> 1;
+
+	if (newCarry) {
+		A_ |= 0x01;
+		F_ |= 0x10;
+	} else {
+		A_ &= !(0x01);
+		F_ &= !(0x10);
+	}
+
+	cycles_done_ = 4;
+}
 
 // 20
-void CPU::JR_NZ_n(){ }
-void CPU::LD_HL_nn(){ }
-void CPU::LDI_pHL_A(){ }
-void CPU::INC_HL(){ }
-void CPU::INC_H(){ }
-void CPU::DEC_H(){ }
-void CPU::LD_H_n(){ }
-void CPU::DAA(){ }
-void CPU::JR_Z_n(){ }
-void CPU::ADD_HL_HL(){ }
-void CPU::LDI_A_pHL(){ }
-void CPU::DEC_HL(){ }
-void CPU::INC_L(){ }
-void CPU::DEC_L(){ }
-void CPU::LD_L_n(){ }
-void CPU::CPL(){ }
+void CPU::JR_NZ_n(){
+	BYTE n; int8_t m = 0;
+	mmu_->readByte(PC_++, n);
+	m |= n;
+
+	if (F_ & 0x80) {
+		cycles_done_ = 8;
+	} else {
+		PC_ = PC_ + m;
+		cycles_done_ = 12;
+	}
+}
+
+void CPU::LD_HL_nn(){
+	WORD temp;
+	mmu_->readWord(PC_, temp);
+	H_ = (temp >> 8) & 0xFF;
+	L_ = temp&0xFF;
+	PC_+=2;
+
+	cycles_done_ = 12;
+}
+
+void CPU::LDI_pHL_A(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->writeByte(address, A_);
+
+	INC_HL();
+	// INC_HL has the cycles done set to 8. This is exactly what we need.
+	// So we don't set cycles_done_ here
+}
+
+void CPU::INC_HL(){
+	L_ += 0x01;
+	if (!L_)
+		H_ += 0x01;
+
+	cycles_done_ = 8;
+}
+
+void CPU::INC_H(){
+	BYTE temp = H_ + 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ &= !(0x40); // reset N flag
+	if ((H_&0x0F + 0x01)&0x10)
+		F_ |= 0x20; // half carry flag
+
+	H_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::DEC_H(){
+	BYTE temp = H_ - 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ |= 0x40; // set N flag
+	if ((H_&0x0F - 0x01) >= 0x0F)
+		F_ |= 0x20; // half carry flag
+
+	H_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_H_n(){
+	mmu_->readByte(PC_++, H_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::DAA(){
+	// I don't care about this opcode, but I will print if a ROM uses
+	// it so I know that I have to use it. I will implement it then.
+	std::cout << "OPCODE DAA() used. MUST IMPLEMENT.\n";
+}
+
+void CPU::JR_Z_n(){
+	BYTE n; int8_t m = 0;
+	mmu_->readByte(PC_++, n);
+	m |= n;
+
+	if (F_ & 0x80) {
+		PC_ = PC_ + m;
+		cycles_done_ = 12;
+	} else {
+		cycles_done_ = 8;
+	}
+}
+
+void CPU::ADD_HL_HL(){
+	WORD hl = (H_ << 8) | L_;
+	WORD sum = hl + hl;
+
+	// did we have a carry?
+	if (sum < hl)
+		F_ |= 0x10;
+	F_ &= !(0x40); // reset N
+	// not implementing H flag
+	H_ = sum >> 8;
+	L_ = sum & 0xFF;
+
+	cycles_done_ = 8;
+}
+
+void CPU::LDI_A_pHL(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, A_);
+
+	INC_HL();
+	// we don't set cycles_done_ because INC_HL already
+	// sets the correct one.
+}
+
+void CPU::DEC_HL(){
+	WORD w = (H_ << 8) | L_;
+	w--;
+	H_ = w >> 8;
+	L_ = w & 0xFF;
+
+	cycles_done_ = 8;
+}
+
+void CPU::INC_L(){
+	BYTE temp = L_ + 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ &= !(0x40); // reset N flag
+	if ((L_&0x0F + 0x01)&0x10)
+		F_ |= 0x20; // half carry flag
+
+	L_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::DEC_L(){
+	BYTE temp = L_ - 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ |= 0x40; // set N flag
+	if ((L_&0x0F - 0x01) >= 0x0F)
+		F_ |= 0x20; // half carry flag
+
+	L_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_L_n(){
+	mmu_->readByte(PC_++, L_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::CPL(){
+	A_ ^= 0xFF;
+	F_ |= 0x60; // set the N and H flags
+
+	cycles_done_ = 4;
+}
 
 // 30
-void CPU::JR_NC_n(){ }
-void CPU::LD_SP_nn(){ }
-void CPU::LDD_pHL_A(){ }
-void CPU::INC_SP(){ }
-void CPU::INC_pHL(){ }
-void CPU::DEC_pHL(){ }
-void CPU::LD_pHL_n(){ }
-void CPU::SCF(){ }
-void CPU::JR_C_n(){ }
-void CPU::ADD_HL_SP(){ }
-void CPU::LDD_A_pHL(){ }
-void CPU::DEC_SP(){ }
-void CPU::INC_A(){ }
-void CPU::DEC_A(){ }
-void CPU::LD_A_n(){ }
-void CPU::CCF(){ }
+void CPU::JR_NC_n(){
+	BYTE n; int8_t m = 0;
+	mmu_->readByte(PC_++, n);
+	m |= n;
+
+	if (F_ & 0x10) {
+		cycles_done_ = 8;
+	} else {
+		PC_ = PC_ + m;
+		cycles_done_ = 12;
+	}
+}
+
+void CPU::LD_SP_nn(){
+	WORD temp;
+	mmu_->readWord(PC_, temp);
+	SP_ = temp;
+	PC_+=2;
+
+	cycles_done_ = 12;
+}
+
+void CPU::LDD_pHL_A(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->writeByte(address, A_);
+
+	DEC_HL();
+	// We don't need to set cycles_done_ here
+	// because DEC_HL sets the correct value.
+}
+
+void CPU::INC_SP(){
+	SP_++;
+
+	cycles_done_ = 8;
+}
+
+void CPU::INC_pHL(){
+	BYTE b;
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, b);
+	b++;
+	mmu_->writeByte(address, b);
+
+	// zero flag
+	if (b == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// N flag
+	F_ &= !(0x40);
+
+	// HALF CARRY FLAG SHOULD BE SET BUT I'M SKIPPING UNLESS I NEED TO DO DAA
+
+	cycles_done_ = 12;
+}
+
+void CPU::DEC_pHL(){
+	BYTE b;
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, b);
+	b--;
+	mmu_->writeByte(address, b);
+
+	// zero flag
+	if (b == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// N flag
+	F_ |= 0x40;
+
+	// HALF CARRY FLAG SHOULD BE SET BUT I'M SKIPPING UNLESS I NEED TO DO DAA
+
+	cycles_done_ = 12;
+}
+
+void CPU::LD_pHL_n(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->writeByte(address, PC_++);
+
+	cycles_done_ = 12;
+}
+
+void CPU::SCF(){
+	F_ &= !(0x60); // reset N and H
+	F_ |= 0x10; // set carry flag
+
+	cycles_done_ = 4;
+}
+
+void CPU::JR_C_n(){
+	BYTE n; int8_t m = 0;
+	mmu_->readByte(PC_++, n);
+	m |= n;
+
+	if (F_ & 0x10) {
+		PC_ = PC_ + m;
+		cycles_done_ = 12;
+	} else {
+		cycles_done_ = 8;
+	}
+}
+
+void CPU::ADD_HL_SP(){
+	WORD hl = (H_ << 8) | L_;
+	WORD sum = hl + SP_;
+
+	// did we have a carry?
+	if (sum < hl && sum < SP_)
+		F_ |= 0x10;
+	F_ &= !(0x40); // reset N
+	// not implementing H flag
+	H_ = sum >> 8;
+	L_ = sum & 0xFF;
+
+	cycles_done_ = 8;
+}
+
+void CPU::LDD_A_pHL(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, A_);
+
+	DEC_HL();
+	// we don't set cycles_done_ because DEC_HL already
+	// sets the correct one.
+}
+
+void CPU::DEC_SP(){
+	SP_--;
+
+	cycles_done_ = 8;
+}
+
+void CPU::INC_A(){
+	BYTE temp = A_ + 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ &= !(0x40); // reset N flag
+	if ((A_&0x0F + 0x01)&0x10)
+		F_ |= 0x20; // half carry flag
+
+	A_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::DEC_A(){
+	BYTE temp = A_ - 0x01;
+
+	if (temp == 0x00)
+		F_ |= 0x80; // set Zero flag
+	F_ |= 0x40; // set N flag
+	if ((A_&0x0F - 0x01) >= 0x0F)
+		F_ |= 0x20; // half carry flag
+
+	A_ = temp;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_A_n(){
+	mmu_->readByte(PC_++, A_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::CCF(){
+	A_ ^= 0xFF;
+	F_ &= !(0x60); // reset the N and H flags
+	F_ ^= 0x10;
+
+	cycles_done_ = 4;
+}
 
 // 40
-void CPU::LD_B_B(){ }
-void CPU::LD_B_C(){ }
-void CPU::LD_B_D(){ }
-void CPU::LD_B_E(){ }
-void CPU::LD_B_H(){ }
-void CPU::LD_B_L(){ }
-void CPU::LD_B_pHL(){ }
-void CPU::LD_B_A(){ }
-void CPU::LD_C_B(){ }
-void CPU::LD_C_C(){ }
-void CPU::LD_C_D(){ }
-void CPU::LD_C_E(){ }
-void CPU::LD_C_H(){ }
-void CPU::LD_C_L(){ }
-void CPU::LD_C_pHL(){ }
-void CPU::LD_C_A(){ }
+void CPU::LD_B_B(){
+	B_ = B_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_B_C(){
+	B_ = C_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_B_D(){
+	B_ = D_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_B_E(){
+	B_ = E_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_B_H(){
+	B_ = H_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_B_L(){
+	B_ = L_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_B_pHL(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, B_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_B_A(){
+	B_ = A_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_C_B(){
+	C_ = B_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_C_C(){
+	C_ = C_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_C_D(){
+	C_ = D_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_C_E(){
+	C_ = E_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_C_H(){
+	C_ = H_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_C_L(){
+	C_ = L_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_C_pHL(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, C_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_C_A(){
+	C_ = A_;
+
+	cycles_done_ = 4;
+}
 
 // 50
-void CPU::LD_D_B(){ }
-void CPU::LD_D_C(){ }
-void CPU::LD_D_D(){ }
-void CPU::LD_D_E(){ }
-void CPU::LD_D_H(){ }
-void CPU::LD_D_L(){ }
-void CPU::LD_D_pHL(){ }
-void CPU::LD_D_A(){ }
-void CPU::LD_E_B(){ }
-void CPU::LD_E_C(){ }
-void CPU::LD_E_D(){ }
-void CPU::LD_E_E(){ }
-void CPU::LD_E_H(){ }
-void CPU::LD_E_L(){ }
-void CPU::LD_E_pHL(){ }
-void CPU::LD_E_A(){ }
+void CPU::LD_D_B(){
+	D_ = B_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_D_C(){
+	D_ = C_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_D_D(){
+	D_ = D_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_D_E(){
+	D_ = E_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_D_H(){
+	D_ = H_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_D_L(){
+	D_ = L_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_D_pHL(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, D_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_D_A(){
+	D_ = A_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_E_B(){
+	E_ = B_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_E_C(){
+	E_ = C_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_E_D(){
+	E_ = D_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_E_E(){
+	E_ = E_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_E_H(){
+	E_ = H_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_E_L(){
+	E_ = L_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_E_pHL(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, E_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_E_A(){
+	E_ = A_;
+
+	cycles_done_ = 4;
+}
 
 // 60
-void CPU::LD_H_B(){ }
-void CPU::LD_H_C(){ }
-void CPU::LD_H_D(){ }
-void CPU::LD_H_E(){ }
-void CPU::LD_H_H(){ }
-void CPU::LD_H_L(){ }
-void CPU::LD_H_pHL(){ }
-void CPU::LD_H_A(){ }
-void CPU::LD_L_B(){ }
-void CPU::LD_L_C(){ }
-void CPU::LD_L_D(){ }
-void CPU::LD_L_E(){ }
-void CPU::LD_L_H(){ }
-void CPU::LD_L_L(){ }
-void CPU::LD_L_pHL(){ }
-void CPU::LD_L_A(){ }
+void CPU::LD_H_B(){
+	H_ = B_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_H_C(){
+	H_ = C_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_H_D(){
+	H_ = D_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_H_E(){
+	H_ = E_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_H_H(){
+	H_ = H_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_H_L(){
+	H_ = L_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_H_pHL(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, H_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_H_A(){
+	H_ = A_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_L_B(){
+	L_ = B_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_L_C(){
+	L_ = C_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_L_D(){
+	L_ = D_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_L_E(){
+	L_ = E_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_L_H(){
+	L_ = H_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_L_L(){
+	L_ = L_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_L_pHL(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, L_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_L_A(){
+	L_ = A_;
+
+	cycles_done_ = 4;
+}
 
 // 70
-void CPU::LD_pHL_B(){ }
-void CPU::LD_pHL_C(){ }
-void CPU::LD_pHL_D(){ }
-void CPU::LD_pHL_E(){ }
-void CPU::LD_pHL_H(){ }
-void CPU::LD_pHL_L(){ }
-void CPU::HALT(){ }
-void CPU::LD_pHL_A(){ }
-void CPU::LD_A_B(){ }
-void CPU::LD_A_C(){ }
-void CPU::LD_A_D(){ }
-void CPU::LD_A_E(){ }
-void CPU::LD_A_H(){ }
-void CPU::LD_A_L(){ }
-void CPU::LD_A_pHL(){ }
-void CPU::LD_A_A(){ }
+void CPU::LD_pHL_B(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->writeByte(address, B_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_pHL_C(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->writeByte(address, C_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_pHL_D(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->writeByte(address, D_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_pHL_E(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->writeByte(address, E_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_pHL_H(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->writeByte(address, H_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_pHL_L(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->writeByte(address, L_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::HALT(){
+	if (mmu_->ime_) {
+		halted_ = true;
+	} else {
+		PC_++;
+	}
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_pHL_A(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->writeByte(address, A_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_A_B(){
+	A_ = B_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_A_C(){
+	A_ = C_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_A_D(){
+	A_ = D_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_A_E(){
+	A_ = E_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_A_H(){
+	A_ = H_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_A_L(){
+	A_ = L_;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_A_pHL(){
+	WORD address = (H_ << 8) | L_;
+	mmu_->readByte(address, A_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_A_A(){
+	A_ = A_;
+
+	cycles_done_ = 4;
+}
 
 // 80
-void CPU::ADD_A_B(){ }
-void CPU::ADD_A_C(){ }
-void CPU::ADD_A_D(){ }
-void CPU::ADD_A_E(){ }
-void CPU::ADD_A_H(){ }
-void CPU::ADD_A_L(){ }
-void CPU::ADD_A_pHL(){ }
-void CPU::ADD_A_A(){ }
-void CPU::ADC_A_B(){ }
-void CPU::ADC_A_C(){ }
-void CPU::ADC_A_D(){ }
-void CPU::ADC_A_E(){ }
-void CPU::ADC_A_H(){ }
-void CPU::ADC_A_L(){ }
-void CPU::ADC_A_pHL(){ }
-void CPU::ADC_A_A(){ }
+void CPU::ADD_A_B(){
+	BYTE sum = A_ + B_;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum < A_ && sum < B_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADD_A_C(){
+	BYTE sum = A_ + C_;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum < A_ && sum < C_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADD_A_D(){
+	BYTE sum = A_ + D_;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum < A_ && sum < D_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADD_A_E(){
+	BYTE sum = A_ + E_;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum < A_ && sum < E_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADD_A_H(){
+	BYTE sum = A_ + H_;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum < A_ && sum < H_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADD_A_L(){
+	BYTE sum = A_ + L_;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum < A_ && sum < L_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADD_A_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	BYTE sum = A_ + n;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum < A_ && sum < n)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 8;
+}
+
+void CPU::ADD_A_A(){
+	BYTE sum = A_ + A_;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum < A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADC_A_B(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE sum = A_ + B_ + carry;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum <= A_ && sum <= B_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADC_A_C(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE sum = A_ + C_ + carry;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum <= A_ && sum <= C_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADC_A_D(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE sum = A_ + D_ + carry;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum <= A_ && sum <= D_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADC_A_E(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE sum = A_ + E_ + carry;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum <= A_ && sum <= E_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADC_A_H(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE sum = A_ + H_ + carry;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum <= A_ && sum <= H_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADC_A_L(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE sum = A_ + L_ + carry;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum <= A_ && sum <= L_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
+
+void CPU::ADC_A_pHL(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	BYTE sum = A_ + n + carry;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum <= A_ && sum <= n)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 8;
+}
+
+void CPU::ADC_A_A(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE sum = A_ + A_ + carry;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum <= A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 4;
+}
 
 // 90
-void CPU::SUB_B(){ }
-void CPU::SUB_C(){ }
-void CPU::SUB_D(){ }
-void CPU::SUB_E(){ }
-void CPU::SUB_H(){ }
-void CPU::SUB_L(){ }
-void CPU::SUB_pHL(){ }
-void CPU::SUB_A(){ }
-void CPU::SBC_A_B(){ }
-void CPU::SBC_A_C(){ }
-void CPU::SBC_A_D(){ }
-void CPU::SBC_A_E(){ }
-void CPU::SBC_A_H(){ }
-void CPU::SBC_A_L(){ }
-void CPU::SBC_A_pHL(){ }
-void CPU::SBC_A_A(){ }
+void CPU::SUB_B(){
+	BYTE ans = A_ - B_;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (B_ > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SUB_C(){
+	BYTE ans = A_ - C_;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (C_ > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SUB_D(){
+	BYTE ans = A_ - D_;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (D_ > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SUB_E(){
+	BYTE ans = A_ - E_;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (E_ > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SUB_H(){
+	BYTE ans = A_ - H_;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (H_ > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SUB_L(){
+	BYTE ans = A_ - L_;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (L_ > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SUB_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	BYTE ans = A_ - n;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (n > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SUB_A(){
+	BYTE ans = A_ - A_;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (A_ > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SBC_A_B(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE ans = A_ - B_ - carry;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if ((B_+carry) > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SBC_A_C(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE ans = A_ - C_ - carry;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if ((C_+carry) > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SBC_A_D(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE ans = A_ - D_ - carry;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if ((D_+carry) > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SBC_A_E(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE ans = A_ - E_ - carry;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if ((E_+carry) > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SBC_A_H(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE ans = A_ - H_ - carry;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if ((H_+carry) > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SBC_A_L(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE ans = A_ - L_ - carry;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if ((L_+carry) > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
+
+void CPU::SBC_A_pHL(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	BYTE ans = A_ - n - carry;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if ((n+carry) > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SBC_A_A(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE ans = A_ - A_ - carry;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if ((A_+carry) > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 4;
+}
 
 // A0
-void CPU::AND_B(){ }
-void CPU::AND_C(){ }
-void CPU::AND_D(){ }
-void CPU::AND_E(){ }
-void CPU::AND_H(){ }
-void CPU::AND_L(){ }
-void CPU::AND_pHL(){ }
-void CPU::AND_A(){ }
-void CPU::XOR_B(){ }
-void CPU::XOR_C(){ }
-void CPU::XOR_D(){ }
-void CPU::XOR_E(){ }
-void CPU::XOR_H(){ }
-void CPU::XOR_L(){ }
-void CPU::XOR_pHL(){ }
-void CPU::XOR_A(){ }
+void CPU::AND_B(){
+	A_ &= B_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x50);
+
+	cycles_done_ = 4;
+}
+
+void CPU::AND_C(){
+	A_ &= C_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x50);
+
+	cycles_done_ = 4;
+}
+
+void CPU::AND_D(){
+	A_ &= D_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x50);
+
+	cycles_done_ = 4;
+}
+
+void CPU::AND_E(){
+	A_ &= E_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x50);
+
+	cycles_done_ = 4;
+}
+
+void CPU::AND_H(){
+	A_ &= H_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x50);
+
+	cycles_done_ = 4;
+}
+
+void CPU::AND_L(){
+	A_ &= L_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x50);
+
+	cycles_done_ = 4;
+}
+
+void CPU::AND_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	A_ &= n;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x50);
+
+	cycles_done_ = 8;
+}
+
+void CPU::AND_A(){
+	A_ &= A_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x50);
+
+	cycles_done_ = 4;
+}
+
+void CPU::XOR_B(){
+	A_ ^= B_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset all flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::XOR_C(){
+	A_ ^= C_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset all flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::XOR_D(){
+	A_ ^= D_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset all flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::XOR_E(){
+	A_ ^= E_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset all flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::XOR_H(){
+	A_ ^= H_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset all flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::XOR_L(){
+	A_ ^= L_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset all flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::XOR_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	A_ ^= n;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset all flags
+
+	cycles_done_ = 8;
+}
+
+void CPU::XOR_A(){
+	A_ ^= A_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset all flags
+
+	cycles_done_ = 4;
+}
 
 // B0
-void CPU::OR_B(){ }
-void CPU::OR_C(){ }
-void CPU::OR_D(){ }
-void CPU::OR_E(){ }
-void CPU::OR_H(){ }
-void CPU::OR_L(){ }
-void CPU::OR_pHL(){ }
-void CPU::OR_A(){ }
-void CPU::CP_B(){ }
-void CPU::CP_C(){ }
-void CPU::CP_D(){ }
-void CPU::CP_E(){ }
-void CPU::CP_H(){ }
-void CPU::CP_L(){ }
-void CPU::CL_pHL(){ }
-void CPU::CP_A(){ }
+void CPU::OR_B(){
+	A_ |= B_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::OR_C(){
+	A_ |= C_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::OR_D(){
+	A_ |= D_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::OR_E(){
+	A_ |= E_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::OR_H(){
+	A_ |= H_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::OR_L(){
+	A_ |= L_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::OR_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	A_ |= n;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset flags
+
+	cycles_done_ = 8;
+}
+
+void CPU::OR_A(){
+	A_ |= A_;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset flags
+
+	cycles_done_ = 4;
+}
+
+void CPU::CP_B(){
+	if (A_ == B_) {
+		F_ |= 0x80;
+		F_ |= 0x40;
+		F_ &= !(0x30);
+	} else if (A_ < B_) {
+		F_ |= 0x10;
+		F_ &= !(0xE0);
+	} else {
+		F_ &= !(0xF0);
+	}
+
+	cycles_done_ = 4;
+}
+
+void CPU::CP_C(){
+	if (A_ == C_) {
+		F_ |= 0x80;
+		F_ |= 0x40;
+		F_ &= !(0x30);
+	} else if (A_ < C_) {
+		F_ |= 0x10;
+		F_ &= !(0xE0);
+	} else {
+		F_ &= !(0xF0);
+	}
+
+	cycles_done_ = 4;
+}
+
+void CPU::CP_D(){
+	if (A_ == D_) {
+		F_ |= 0x80;
+		F_ |= 0x40;
+		F_ &= !(0x30);
+	} else if (A_ < D_) {
+		F_ |= 0x10;
+		F_ &= !(0xE0);
+	} else {
+		F_ &= !(0xF0);
+	}
+
+	cycles_done_ = 4;
+}
+
+void CPU::CP_E(){
+	if (A_ == E_) {
+		F_ |= 0x80;
+		F_ |= 0x40;
+		F_ &= !(0x30);
+	} else if (A_ < E_) {
+		F_ |= 0x10;
+		F_ &= !(0xE0);
+	} else {
+		F_ &= !(0xF0);
+	}
+
+	cycles_done_ = 4;
+}
+
+void CPU::CP_H(){
+	if (A_ == H_) {
+		F_ |= 0x80;
+		F_ |= 0x40;
+		F_ &= !(0x30);
+	} else if (A_ < H_) {
+		F_ |= 0x10;
+		F_ &= !(0xE0);
+	} else {
+		F_ &= !(0xF0);
+	}
+
+	cycles_done_ = 4;
+}
+
+void CPU::CP_L(){
+	if (A_ == L_) {
+		F_ |= 0x80;
+		F_ |= 0x40;
+		F_ &= !(0x30);
+	} else if (A_ < L_) {
+		F_ |= 0x10;
+		F_ &= !(0xE0);
+	} else {
+		F_ &= !(0xF0);
+	}
+
+	cycles_done_ = 4;
+}
+
+void CPU::CL_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	if (A_ == n) {
+		F_ |= 0x80;
+		F_ |= 0x40;
+		F_ &= !(0x30);
+	} else if (A_ < n) {
+		F_ |= 0x10;
+		F_ &= !(0xE0);
+	} else {
+		F_ &= !(0xF0);
+	}
+
+	cycles_done_ = 8;
+}
+
+void CPU::CP_A(){
+	if (A_ == A_) {
+		F_ |= 0x80;
+		F_ |= 0x40;
+		F_ &= !(0x30);
+	} else if (A_ < A_) {
+		F_ |= 0x10;
+		F_ &= !(0xE0);
+	} else {
+		F_ &= !(0xF0);
+	}
+
+	cycles_done_ = 4;
+}
 
 // C0
-void CPU::RET_NZ(){ }
-void CPU::POP_BC(){ }
-void CPU::JP_NZ_pnn(){ }
-void CPU::JP_pnn(){ }
-void CPU::CALL_NZ_pnn(){ }
-void CPU::PUSH_BC(){ }
-void CPU::ADD_A_n(){ }
-void CPU::RST_00H(){ }
-void CPU::RET_Z(){ }
-void CPU::RET(){ }
-void CPU::JP_Z_pnn(){ }
+void CPU::RET_NZ(){
+	if (F_ & 0x80) {
+		cycles_done_ = 8;
+	} else {
+		RET();
+		cycles_done_ = 20;
+	}
+}
+
+void CPU::POP_BC(){
+	WORD w;
+	mmu_->readWord(SP_, w);
+	SP_ += 2;
+
+	B_ = (w >> 8) & 0xFF;
+	C_ = w & 0xFF;
+
+	cycles_done_ = 12;
+}
+
+void CPU::JP_NZ_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	if (F_ & 0x80) {
+		cycles_done_ = 12;
+	} else {
+		PC_ = address;
+		cycles_done_ = 16;
+	}
+}
+
+void CPU::JP_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+	PC_ = address;
+
+	cycles_done_ = 16;
+}
+
+void CPU::CALL_NZ_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	if (F_ & 0x80) {
+		cycles_done_ = 12;
+	} else {
+		SP_ -= 2;
+		mmu_->writeWord(SP_, PC_);
+		PC_ = address;
+
+		cycles_done_ = 24;
+	}
+}
+
+void CPU::PUSH_BC(){
+	WORD val = (B_ << 8) | C_;
+	SP_ -= 2;
+	mmu_->writeWord(SP_, val);
+
+	cycles_done_ = 16;
+}
+
+void CPU::ADD_A_n(){
+	BYTE n; mmu_->readByte(PC_++, n);
+
+	BYTE sum = A_ + n;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum <= A_ && sum <= n)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 8;
+}
+
+void CPU::RST_00H(){
+	SP_ -= 2;
+	mmu_->writeWord(SP_, PC_);
+
+	PC_ = 0x0000;
+
+	cycles_done_ = 16;
+}
+
+void CPU::RET_Z(){
+	if (F_ & 0x80) {
+		RET();
+		cycles_done_ = 20;
+	} else {
+		cycles_done_ = 8;
+	}
+}
+
+void CPU::RET(){
+	mmu_->readWord(SP_, PC_);
+	SP_ += 2;
+
+	cycles_done_ = 16;
+}
+
+void CPU::JP_Z_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	if (F_ & 0x80) {
+		PC_ = address;
+		cycles_done_ = 16;
+	} else {
+		cycles_done_ = 12;
+	}
+}
+
 void CPU::PREFIX_CB(){ }
-void CPU::CALL_Z_pnn(){ }
-void CPU::CALL_pnn(){ }
-void CPU::ADC_A_n(){ }
-void CPU::RST_08H(){ }
+void CPU::CALL_Z_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	if (F_ & 0x80) {
+		SP_ -= 2;
+		mmu_->writeWord(SP_, PC_);
+		PC_ = address;
+
+		cycles_done_ = 24;
+	} else {
+		cycles_done_ = 12;
+	}
+}
+
+void CPU::CALL_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	SP_ -= 2;
+	mmu_->writeWord(SP_, PC_);
+	PC_ = address;
+
+	cycles_done_ = 24;
+}
+
+void CPU::ADC_A_n(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE n; mmu_->readByte(PC_++, n);
+
+	BYTE sum = A_ + n + carry;
+
+	F_ &= !(0x40); // reset N flag
+	
+	// set Z flag
+	if (sum == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (sum <= A_ && sum <= n)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = sum;
+
+	cycles_done_ = 8;
+}
+
+void CPU::RST_08H(){
+	SP_ -= 2;
+	mmu_->writeWord(SP_, PC_);
+
+	PC_ = 0x0008;
+
+	cycles_done_ = 16;
+}
 
 // D0
-void CPU::RET_NC(){ }
-void CPU::POP_DE(){ }
-void CPU::JP_NC_pnn(){ }
+void CPU::RET_NC(){
+	if (F_ & 0x10) {
+		cycles_done_ = 8;
+	} else {
+		RET();
+		cycles_done_ = 20;
+	}
+}
+
+void CPU::POP_DE(){
+	WORD w;
+	mmu_->readWord(SP_, w);
+	SP_ += 2;
+
+	D_ = (w >> 8) & 0xFF;
+	E_ = w & 0xFF;
+
+	cycles_done_ = 12;
+}
+
+void CPU::JP_NC_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	if (F_ & 0x10) {
+		cycles_done_ = 12;
+	} else {
+		PC_ = address;
+		cycles_done_ = 16;
+	}
+}
+
 // XX
-void CPU::CALL_NC_pnn(){ }
-void CPU::PUSH_DE(){ }
-void CPU::SUB_n(){ }
-void CPU::RST_10H(){ }
-void CPU::RET_C(){ }
-void CPU::RETI(){ }
-void CPU::JP_C_pnn(){ }
+void CPU::CALL_NC_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	if (F_ & 0x10) {
+		cycles_done_ = 12;
+	} else {
+		SP_ -= 2;
+		mmu_->writeWord(SP_, PC_);
+		PC_ = address;
+
+		cycles_done_ = 24;
+	}
+}
+
+void CPU::PUSH_DE(){
+	WORD val = (D_ << 8) | E_;
+	SP_ -= 2;
+	mmu_->writeWord(SP_, val);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SUB_n(){
+	BYTE n; mmu_->readByte(PC_++, n);
+	BYTE ans = A_ - n;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if (n > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 8;
+}
+
+void CPU::RST_10H(){
+	SP_ -= 2;
+	mmu_->writeWord(SP_, PC_);
+
+	PC_ = 0x0010;
+
+	cycles_done_ = 16;
+}
+
+void CPU::RET_C(){
+	if (F_ & 0x10) {
+		RET();
+		cycles_done_ = 20;
+	} else {
+		cycles_done_ = 8;
+	}
+}
+
+void CPU::RETI(){
+	RET();
+	mmu_->ime_ = true;
+
+	// no need to set cycles_done_, this is done in RET
+}
+
+void CPU::JP_C_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	if (F_ & 0x10) {
+		PC_ = address;
+		cycles_done_ = 16;
+	} else {
+		cycles_done_ = 12;
+	}
+}
+
 // XX
-void CPU::CALL_C_pnn(){ }
+void CPU::CALL_C_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	if (F_ & 0x10) {
+		SP_ -= 2;
+		mmu_->writeWord(SP_, PC_);
+		PC_ = address;
+
+		cycles_done_ = 24;
+	} else {
+		cycles_done_ = 12;
+	}
+}
+
 // XX
-void CPU::SBC_A_n(){ }
-void CPU::RST_18H(){ }
+void CPU::SBC_A_n(){
+	BYTE carry;
+	if (F_ & 0x10)
+		carry = 0x01;
+	else
+		carry = 0x00;
+
+	BYTE n; mmu_->readByte(PC_++, n);
+	BYTE ans = A_ - n - carry;
+
+	F_ |= 0x40; // set N flag
+
+	// set Z flag
+	if (ans == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	// set C flag
+	if ((n+carry) > A_)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	A_ = ans;
+
+	cycles_done_ = 8;
+}
+
+void CPU::RST_18H(){
+	SP_ -= 2;
+	mmu_->writeWord(SP_, PC_);
+
+	PC_ = 0x0018;
+
+	cycles_done_ = 16;
+}
 
 // E0
-void CPU::LDH_pnn_A(){ }
-void CPU::POP_HL(){ }
-void CPU::LD_pC_A(){ }
+void CPU::LDH_pnn_A(){
+	BYTE n; mmu_->readByte(PC_++, n);
+	WORD address = 0xFF00 | n;
+
+	mmu_->writeByte(address, A_);
+
+	cycles_done_ = 12;
+}
+
+void CPU::POP_HL(){
+	WORD w;
+	mmu_->readWord(SP_, w);
+	SP_ += 2;
+
+	H_ = (w >> 8) & 0xFF;
+	L_ = w & 0xFF;
+
+	cycles_done_ = 12;
+}
+
+void CPU::LD_pC_A(){
+	WORD address = 0xFF00 + C_;
+	mmu_->writeByte(address, A_);
+
+	cycles_done_ = 8;
+}
+
 // XX
 // XX
-void CPU::PUSH_HL(){ }
-void CPU::AND_n(){ }
-void CPU::RST_20H(){ }
-void CPU::ADD_SP_n(){ }
-void CPU::JP_pHL(){ }
-void CPU::LD_pnn_A(){ }
+void CPU::PUSH_HL(){
+	WORD val = (H_ << 8) | L_;
+	SP_ -= 2;
+	mmu_->writeWord(SP_, val);
+
+	cycles_done_ = 16;
+}
+
+void CPU::AND_n(){
+	BYTE n; mmu_->readByte(PC_++, n);
+	A_ &= n;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x50);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RST_20H(){
+	SP_ -= 2;
+	mmu_->writeWord(SP_, PC_);
+
+	PC_ = 0x0020;
+
+	cycles_done_ = 16;
+}
+
+void CPU::ADD_SP_n(){
+	BYTE n; int8_t m = 0;
+	mmu_->readByte(PC_++, n);
+	m |= n;
+
+	SP_ += m;
+
+	F_ &= !(0xC0); // reset Z and N flags
+
+	// C flag
+	// should be a check here, but come on, its the stack pointer its not going
+	// to carry.
+	F_ &= !(0x10);
+}
+
+void CPU::JP_pHL(){
+	WORD address = (H_ << 8) | L_;
+	PC_ = address;
+
+	cycles_done_ = 4;
+}
+
+void CPU::LD_pnn_A(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	mmu_->writeByte(address, A_);
+
+	cycles_done_ = 16;
+}
+
 // XX
 // XX
 // XX
-void CPU::XOR_n(){ }
-void CPU::RST_28H(){ }
+void CPU::XOR_n(){
+	BYTE n; mmu_->readByte(PC_++, n);
+	A_ ^= n;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset all flags
+
+	cycles_done_ = 8;
+}
+
+void CPU::RST_28H(){
+	SP_ -= 2;
+	mmu_->writeWord(SP_, PC_);
+
+	PC_ = 0x0028;
+
+	cycles_done_ = 16;
+}
 
 // F0
-void CPU::LDH_A_pnn(){ }
-void CPU::POP_AF(){ }
-void CPU::LD_A_pC(){ }
-void CPU::DI(){ }
+void CPU::LDH_A_pnn(){
+	BYTE n; mmu_->readByte(PC_++, n);
+	WORD address = 0xFF00 | n;
+
+	mmu_->readByte(address, A_);
+
+	cycles_done_ = 12;
+}
+
+void CPU::POP_AF(){
+	WORD w;
+	mmu_->readWord(SP_, w);
+	SP_ += 2;
+
+	A_ = (w >> 8) & 0xFF;
+	F_ = w & 0xFF;
+
+	cycles_done_ = 12;
+}
+
+void CPU::LD_A_pC(){
+	WORD address = 0xFF00 + C_;
+	mmu_->readByte(address, A_);
+
+	cycles_done_ = 8;
+}
+
+void CPU::DI(){
+	mmu_->ime_ = false;
+	cycles_done_ = 4;
+}
+
 // XX
-void CPU::PUSH_AF(){ }
-void CPU::OR_n(){ }
-void CPU::RST_30H(){ }
-void CPU::LDHL_SP_n(){ }
-void CPU::LD_SP_HL(){ }
-void CPU::LD_A_pnn(){ }
-void CPU::EI(){ }
+void CPU::PUSH_AF(){
+	WORD val = (A_ << 8) | F_;
+	SP_ -= 2;
+	mmu_->writeWord(SP_, val);
+
+	cycles_done_ = 16;
+}
+
+void CPU::OR_n(){
+	BYTE n; mmu_->readByte(PC_++, n);
+	A_ |= n;
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset flags
+
+	cycles_done_ = 8;
+}
+
+void CPU::RST_30H(){
+	SP_ -= 2;
+	mmu_->writeWord(SP_, PC_);
+
+	PC_ = 0x0030;
+
+	cycles_done_ = 16;
+}
+
+void CPU::LDHL_SP_n(){
+	BYTE n; mmu_->readByte(PC_++, n);
+	WORD w = SP_ + n;
+
+	H_ = (w >> 8) & 0xFF;
+	L_ = w & 0xFF;
+
+	F_ &= !(0xC0);
+
+	cycles_done_ = 12;
+}
+
+void CPU::LD_SP_HL(){
+	WORD w = (H_ << 8) | L_;
+	SP_ = w;
+
+	cycles_done_ = 8;
+}
+
+void CPU::LD_A_pnn(){
+	WORD address;
+	mmu_->readWord(PC_, address);
+	PC_ += 2;
+
+	mmu_->readByte(address, A_);
+
+	cycles_done_ = 16;
+}
+
+void CPU::EI(){
+	mmu_->ime_ = true;
+	cycles_done_ = 4;
+}
+
 // XX
 // XX
-void CPU::CP_n(){ }
-void CPU::RST_38H(){ }
+void CPU::CP_n(){
+	BYTE n; mmu_->readByte(PC_++, n);
+	if (A_ == n) {
+		F_ |= 0x80;
+		F_ |= 0x40;
+		F_ &= !(0x30);
+	} else if (A_ < n) {
+		F_ |= 0x10;
+		F_ &= !(0xE0);
+	} else {
+		F_ &= !(0xF0);
+	}
+
+	cycles_done_ = 8;
+}
+
+void CPU::RST_38H(){
+	SP_ -= 2;
+	mmu_->writeWord(SP_, PC_);
+
+	PC_ = 0x0038;
+
+	cycles_done_ = 16;
+}
 
 // Now the CB opcodes.
 // 00

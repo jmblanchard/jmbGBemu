@@ -5,14 +5,17 @@
 #ifndef _DEFINITIONS_H
 #define _DEFINITIONS_H
 
+#include <cstdint>
+
 // forward declarations
+class Emulator;
 class CPU;
 class MMU;
 class HeaderInfo;
 
 typedef void (CPU::*fn)(); // typedef for function pointers
-typedef unsigned char BYTE;
-typedef unsigned short WORD;
+typedef uint8_t BYTE;
+typedef uint16_t WORD;
 
 const int FRAME_RATE = 60;
 const int CLOCKS_PER_FRAME = 70224;

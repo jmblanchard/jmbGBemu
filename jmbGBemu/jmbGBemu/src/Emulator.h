@@ -23,6 +23,10 @@ public:
     void shutdown();
 
 	void setRunning(bool b);
+	void updateClocks(int cycles);
+
+	void setTimerRunning(bool b);
+	void setTimerMode(BYTE b);
 
 private:
     std::string filename_;
@@ -33,8 +37,15 @@ private:
 	bool running_;
 
 	int current_clocks_;
+	int div_clocks_;
+	int timer_clocks_;
 	int clocks_until_next_mode_;
 	Mode current_mode_;
+	Mode timer_mode_;
+	int timer_mode_clocks_[4];
+	bool timer_running_;
+
+	void spinUntilNextFrame();
 };
 
 #endif

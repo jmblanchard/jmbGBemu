@@ -15,7 +15,7 @@
 
 class MMU {
 public:
-	MMU(std::string filename, HeaderInfo *hi);
+	MMU(std::string filename, HeaderInfo *hi, Emulator *emu);
 	~MMU();
 
 	void readByte(WORD address, BYTE &dest);
@@ -23,6 +23,11 @@ public:
 
 	void readWord(WORD address, WORD &dest);
 	void writeWord(WORD address, WORD val);
+
+	void updateDiv();
+	void updateTima();
+	void updateLY();
+	void setLCDCMode(Mode m);
 
 	// direct access to Interrupt Master Enable flag
 	bool ime_;
@@ -67,6 +72,7 @@ private:
 	BYTE stack_ram_[0x7F];
 	BYTE interrupt_enable_register_;
 
+	Emulator *emu_;
 	HeaderInfo *hi_;
 	int num_rom_banks_;
 	int curr_rom_bank_;

@@ -12,19 +12,27 @@
 
 class CPU {
 public:
-	CPU(MMU *mmu, HeaderInfo *hi);
+	CPU(MMU *mmu, Emulator *emu, HeaderInfo *hi);
 	~CPU();
 
-	void run();
+	void handleInterrupts();
+	int run();
 
 private:
 	HeaderInfo *hi_;
 	MMU *mmu_; // memory object
+	Emulator *emu_;
 
 	// Registers
 	// A, B, C, D, E, F, H, and L are all 8 bits, SP and PC are 16bits
 	BYTE A_, B_, C_, D_, E_, F_, H_, L_;
 	WORD SP_, PC_;
+
+	// Number of cycles done by last instruction
+	int cycles_done_;
+
+	// we will not process anything except interrupts if halted.
+	bool halted_;
 
 	// Opcode functions.
 	void XX(); // no opcode assigned
