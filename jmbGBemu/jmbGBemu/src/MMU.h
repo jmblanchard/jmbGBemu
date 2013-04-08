@@ -29,6 +29,8 @@ public:
 	void updateLY();
 	void setLCDCMode(Mode m);
 
+	void test(); // will be responsible for testing
+
 	// direct access to Interrupt Master Enable flag
 	bool ime_;
 

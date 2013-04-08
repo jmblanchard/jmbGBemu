@@ -18,12 +18,17 @@ Emulator::~Emulator() {
 void Emulator::run() {
 	int cpu_cycle_complete_; // CPU will return number of cycles just run
 
+	// SOME TEST STUFF
+	//mmu_->test();
+	cpu_->test();
+
+	/*
 	// our emulation loop
 	while (running_) {
 		// TO DO: Handle interrupts here
 		cpu_cycle_complete_ = cpu_->run();
 		updateClocks(cpu_cycle_complete_);
-	}
+	}*/
 }
 
 // Handles cleanup of emulators systems

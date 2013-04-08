@@ -15,6 +15,7 @@ int main(int argc, char *argv[]) {
     else {
 		Emulator *emu = new Emulator();
         emu->initialize(std::string(argv[1]));
+		emu->run();
 		delete emu;
     }
 

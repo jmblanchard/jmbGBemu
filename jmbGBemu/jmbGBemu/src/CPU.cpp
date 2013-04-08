@@ -836,7 +836,9 @@ void CPU::DEC_pHL(){
 
 void CPU::LD_pHL_n(){
 	WORD address = (H_ << 8) | L_;
-	mmu_->writeByte(address, PC_++);
+	BYTE n;
+	mmu_->readByte(PC_++, n);
+	mmu_->writeByte(address, n);
 
 	cycles_done_ = 12;
 }
@@ -2721,7 +2723,14 @@ void CPU::JP_Z_pnn(){
 	}
 }
 
-void CPU::PREFIX_CB(){ }
+void CPU::PREFIX_CB(){
+	BYTE curr_op;
+	mmu_->readByte(PC_++, curr_op);
+
+	// decode and execute
+	cb_opcodes_[curr_op];
+}
+
 void CPU::CALL_Z_pnn(){
 	WORD address;
 	mmu_->readWord(PC_, address);
@@ -3212,289 +3221,3022 @@ void CPU::RST_38H(){
 
 // Now the CB opcodes.
 // 00
-void CPU::RLC_B(){ }
-void CPU::RLC_C(){ }
-void CPU::RLC_D(){ }
-void CPU::RLC_E(){ }
-void CPU::RLC_H(){ }
-void CPU::RLC_L(){ }
-void CPU::RLC_pHL(){ }
-void CPU::RLC_A(){ }
-void CPU::RRC_B(){ }
-void CPU::RRC_C(){ }
-void CPU::RRC_D(){ }
-void CPU::RRC_E(){ }
-void CPU::RRC_H(){ }
-void CPU::RRC_L(){ }
-void CPU::RRC_pHL(){ }
-void CPU::RRC_A(){ }
+void CPU::RLC_B(){
+	BYTE new_carry = B_ & 0x80;
+	BYTE old_carry = F_ & 0x10;
+	B_ = B_ << 1;
+
+	if (old_carry)
+		B_ |= 0x01;
+	else
+		B_ &= !(0x01);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (B_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RLC_C(){
+	BYTE new_carry = C_ & 0x80;
+	BYTE old_carry = F_ & 0x10;
+	C_ = C_ << 1;
+
+	if (old_carry)
+		C_ |= 0x01;
+	else
+		C_ &= !(0x01);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (C_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RLC_D(){
+	BYTE new_carry = D_ & 0x80;
+	BYTE old_carry = F_ & 0x10;
+	D_ = D_ << 1;
+
+	if (old_carry)
+		D_ |= 0x01;
+	else
+		D_ &= !(0x01);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (D_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RLC_E(){
+	BYTE new_carry = E_ & 0x80;
+	BYTE old_carry = F_ & 0x10;
+	E_ = E_ << 1;
+
+	if (old_carry)
+		E_ |= 0x01;
+	else
+		E_ &= !(0x01);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (E_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RLC_H(){
+	BYTE new_carry = H_ & 0x80;
+	BYTE old_carry = F_ & 0x10;
+	H_ = H_ << 1;
+
+	if (old_carry)
+		H_ |= 0x01;
+	else
+		H_ &= !(0x01);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (H_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RLC_L(){
+	BYTE new_carry = L_ & 0x80;
+	BYTE old_carry = F_ & 0x10;
+	L_ = L_ << 1;
+
+	if (old_carry)
+		L_ |= 0x01;
+	else
+		L_ &= !(0x01);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (L_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RLC_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	BYTE new_carry = n & 0x80;
+	BYTE old_carry = F_ & 0x10;
+	n = n << 1;
+
+	if (old_carry)
+		n |= 0x01;
+	else
+		n &= !(0x01);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (n == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RLC_A(){
+	BYTE new_carry = A_ & 0x80;
+	BYTE old_carry = F_ & 0x10;
+	A_ = A_ << 1;
+
+	if (old_carry)
+		A_ |= 0x01;
+	else
+		A_ &= !(0x01);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RRC_B(){
+	BYTE new_carry = B_ & 0x01;
+	BYTE old_carry = F_ & 0x10;
+	B_ = B_ >> 1;
+
+	if (old_carry)
+		B_ |= 0x80;
+	else
+		B_ &= !(0x80);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (B_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RRC_C(){
+	BYTE new_carry = C_ & 0x01;
+	BYTE old_carry = F_ & 0x10;
+	C_ = C_ >> 1;
+
+	if (old_carry)
+		C_ |= 0x80;
+	else
+		C_ &= !(0x80);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (C_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RRC_D(){
+	BYTE new_carry = D_ & 0x01;
+	BYTE old_carry = F_ & 0x10;
+	D_ = D_ >> 1;
+
+	if (old_carry)
+		D_ |= 0x80;
+	else
+		D_ &= !(0x80);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (D_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RRC_E(){
+	BYTE new_carry = E_ & 0x01;
+	BYTE old_carry = F_ & 0x10;
+	E_ = E_ >> 1;
+
+	if (old_carry)
+		E_ |= 0x80;
+	else
+		E_ &= !(0x80);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (E_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RRC_H(){
+	BYTE new_carry = H_ & 0x01;
+	BYTE old_carry = F_ & 0x10;
+	H_ = H_ >> 1;
+
+	if (old_carry)
+		H_ |= 0x80;
+	else
+		H_ &= !(0x80);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (H_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RRC_L(){
+	BYTE new_carry = L_ & 0x01;
+	BYTE old_carry = F_ & 0x10;
+	L_ = L_ >> 1;
+
+	if (old_carry)
+		L_ |= 0x80;
+	else
+		L_ &= !(0x80);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (L_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RRC_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	BYTE new_carry = n & 0x01;
+	BYTE old_carry = F_ & 0x10;
+	n = n >> 1;
+
+	if (old_carry)
+		n |= 0x80;
+	else
+		n &= !(0x80);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (n == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RRC_A(){
+	BYTE new_carry = A_ & 0x01;
+	BYTE old_carry = F_ & 0x10;
+	A_ = A_ >> 1;
+
+	if (old_carry)
+		A_ |= 0x80;
+	else
+		A_ &= !(0x80);
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
 
 // 10
-void CPU::RL_B(){ }
-void CPU::RL_C(){ }
-void CPU::RL_D(){ }
-void CPU::RL_E(){ }
-void CPU::RL_H(){ }
-void CPU::RL_L(){ }
-void CPU::RL_pHL(){ }
-void CPU::RL_A(){ }
-void CPU::RR_B(){ }
-void CPU::RR_C(){ }
-void CPU::RR_D(){ }
-void CPU::RR_E(){ }
-void CPU::RR_H(){ }
-void CPU::RR_L(){ }
-void CPU::RR_pHL(){ }
-void CPU::RR_A(){ }
+void CPU::RL_B(){
+	BYTE new_carry = B_ & 0x80;
+	B_ = B_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (B_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RL_C(){
+	BYTE new_carry = C_ & 0x80;
+	C_ = C_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (C_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RL_D(){
+	BYTE new_carry = D_ & 0x80;
+	D_ = D_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (D_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RL_E(){
+	BYTE new_carry = E_ & 0x80;
+	E_ = E_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (E_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RL_H(){
+	BYTE new_carry = H_ & 0x80;
+	H_ = H_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (H_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RL_L(){
+	BYTE new_carry = L_ & 0x80;
+	L_ = L_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (L_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RL_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	BYTE new_carry = n & 0x80;
+	n = n << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (n == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RL_A(){
+	BYTE new_carry = A_ & 0x80;
+	A_ = A_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RR_B(){
+	BYTE new_carry = B_ & 0x01;
+	B_ = B_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (B_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RR_C(){
+	BYTE new_carry = C_ & 0x01;
+	C_ = C_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (C_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RR_D(){
+	BYTE new_carry = D_ & 0x01;
+	D_ = D_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (D_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RR_E(){
+	BYTE new_carry = E_ & 0x01;
+	E_ = E_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (E_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RR_H(){
+	BYTE new_carry = H_ & 0x01;
+	H_ = H_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (H_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RR_L(){
+	BYTE new_carry = L_ & 0x01;
+	L_ = L_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (L_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RR_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	BYTE new_carry = n & 0x01;
+	n = n >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (n == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RR_A(){
+	BYTE new_carry = A_ & 0x01;
+	A_ = A_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
 
 // 20
-void CPU::SLA_B(){ }
-void CPU::SLA_C(){ }
-void CPU::SLA_D(){ }
-void CPU::SLA_E(){ }
-void CPU::SLA_H(){ }
-void CPU::SLA_L(){ }
-void CPU::SLA_pHL(){ }
-void CPU::SLA_A(){ }
-void CPU::SRA_B(){ }
-void CPU::SRA_C(){ }
-void CPU::SRA_D(){ }
-void CPU::SRA_E(){ }
-void CPU::SRA_H(){ }
-void CPU::SRA_L(){ }
-void CPU::SRA_pHL(){ }
-void CPU::SRA_A(){ }
+void CPU::SLA_B(){
+	BYTE new_carry = B_ & 0x80;
+	B_ = B_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (B_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SLA_C(){
+	BYTE new_carry = C_ & 0x80;
+	C_ = C_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (C_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SLA_D(){
+	BYTE new_carry = D_ & 0x80;
+	D_ = D_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (D_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SLA_E(){
+	BYTE new_carry = E_ & 0x80;
+	E_ = E_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (E_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SLA_H(){
+	BYTE new_carry = H_ & 0x80;
+	H_ = H_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (H_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SLA_L(){
+	BYTE new_carry = L_ & 0x80;
+	L_ = L_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (L_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SLA_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	BYTE new_carry = n & 0x80;
+	n = n << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (n == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SLA_A(){
+	BYTE new_carry = A_ & 0x80;
+	A_ = A_ << 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRA_B(){
+	BYTE new_carry = B_ & 0x80;
+	B_ = (int8_t)B_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (B_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRA_C(){
+	BYTE new_carry = C_ & 0x80;
+	C_ = (int8_t)C_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (C_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRA_D(){
+	BYTE new_carry = D_ & 0x80;
+	D_ = (int8_t)D_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (D_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRA_E(){
+	BYTE new_carry = E_ & 0x80;
+	E_ = (int8_t)E_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (E_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRA_H(){
+	BYTE new_carry = H_ & 0x80;
+	H_ = (int8_t)H_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (H_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRA_L(){
+	BYTE new_carry = L_ & 0x80;
+	L_ = (int8_t)L_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (L_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRA_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	BYTE new_carry = n & 0x80;
+	n = (int8_t)n >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (n == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SRA_A(){
+	BYTE new_carry = A_ & 0x80;
+	A_ = (int8_t)A_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
 
 // 30
-void CPU::SWAP_B(){ }
-void CPU::SWAP_C(){ }
-void CPU::SWAP_D(){ }
-void CPU::SWAP_E(){ }
-void CPU::SWAP_H(){ }
-void CPU::SWAP_L(){ }
-void CPU::SWAP_pHL(){ }
-void CPU::SWAP_A(){ }
-void CPU::SRL_B(){ }
-void CPU::SRL_C(){ }
-void CPU::SRL_D(){ }
-void CPU::SRL_E(){ }
-void CPU::SRL_H(){ }
-void CPU::SRL_L(){ }
-void CPU::SRL_pHL(){ }
-void CPU::SRL_A(){ }
+void CPU::SWAP_B(){
+	B_ = ((B_ << 4) &0xF0) | ((B_ >> 4) & 0x0F);
+
+	// set Z flag
+	if (B_ == 0x00)
+		F_ = 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset N H C
+
+	cycles_done_ = 8;
+}
+
+void CPU::SWAP_C(){
+	C_ = ((C_ << 4) &0xF0) | ((C_ >> 4) & 0x0F);
+
+	// set Z flag
+	if (C_ == 0x00)
+		F_ = 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset N H C
+
+	cycles_done_ = 8;
+}
+
+void CPU::SWAP_D(){
+	D_ = ((D_ << 4) &0xF0) | ((D_ >> 4) & 0x0F);
+
+	// set Z flag
+	if (D_ == 0x00)
+		F_ = 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset N H C
+
+	cycles_done_ = 8;
+}
+
+void CPU::SWAP_E(){
+	E_ = ((E_ << 4) &0xF0) | ((E_ >> 4) & 0x0F);
+
+	// set Z flag
+	if (E_ == 0x00)
+		F_ = 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset N H C
+
+	cycles_done_ = 8;
+}
+
+void CPU::SWAP_H(){
+	H_ = ((H_ << 4) &0xF0) | ((H_ >> 4) & 0x0F);
+
+	// set Z flag
+	if (H_ == 0x00)
+		F_ = 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset N H C
+
+	cycles_done_ = 8;
+}
+
+void CPU::SWAP_L(){
+	L_ = ((L_ << 4) &0xF0) | ((L_ >> 4) & 0x0F);
+
+	// set Z flag
+	if (L_ == 0x00)
+		F_ = 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset N H C
+
+	cycles_done_ = 8;
+}
+
+void CPU::SWAP_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	n = ((n << 4) &0xF0) | ((n >> 4) & 0x0F);
+
+	// set Z flag
+	if (n == 0x00)
+		F_ = 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset N H C
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SWAP_A(){
+	A_ = ((A_ << 4) &0xF0) | ((A_ >> 4) & 0x0F);
+
+	// set Z flag
+	if (A_ == 0x00)
+		F_ = 0x80;
+	else
+		F_ &= !(0x80);
+
+	F_ &= !(0x70); // reset N H C
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRL_B(){
+	BYTE new_carry = B_ & 0x80;
+	B_ = B_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (B_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRL_C(){
+	BYTE new_carry = C_ & 0x80;
+	C_ = C_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (C_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRL_D(){
+	BYTE new_carry = D_ & 0x80;
+	D_ = D_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (D_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRL_E(){
+	BYTE new_carry = E_ & 0x80;
+	E_ = E_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (E_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRL_H(){
+	BYTE new_carry = H_ & 0x80;
+	H_ = H_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (H_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRL_L(){
+	BYTE new_carry = L_ & 0x80;
+	L_ = L_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (L_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::SRL_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	BYTE new_carry = n & 0x80;
+	n = n >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (n == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SRL_A(){
+	BYTE new_carry = A_ & 0x80;
+	A_ = A_ >> 1;
+
+	if (new_carry)
+		F_ |= 0x10;
+	else
+		F_ &= !(0x10);
+
+	F_ &= !(0x60);
+
+	if (A_ == 0x00)
+		F_ |= 0x80;
+	else
+		F_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
 
 // 40
-void CPU::BIT_0_B(){ }
-void CPU::BIT_0_C(){ }
-void CPU::BIT_0_D(){ }
-void CPU::BIT_0_E(){ }
-void CPU::BIT_0_H(){ }
-void CPU::BIT_0_L(){ }
-void CPU::BIT_0_pHL(){ }
-void CPU::BIT_0_A(){ }
-void CPU::BIT_1_B(){ }
-void CPU::BIT_1_C(){ }
-void CPU::BIT_1_D(){ }
-void CPU::BIT_1_E(){ }
-void CPU::BIT_1_H(){ }
-void CPU::BIT_1_L(){ }
-void CPU::BIT_1_pHL(){ }
-void CPU::BIT_1_A(){ }
+void CPU::BIT_0_B(){
+	BYTE n = B_ & 0x01;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_0_C(){
+	BYTE n = C_ & 0x01;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_0_D(){
+	BYTE n = D_ & 0x01;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_0_E(){
+	BYTE n = E_ & 0x01;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_0_H(){
+	BYTE n = H_ & 0x01;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_0_L(){
+	BYTE n = L_ & 0x01;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_0_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	n = n & 0x01;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 16;
+}
+
+void CPU::BIT_0_A(){
+	BYTE n = A_ & 0x01;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_1_B(){
+	BYTE n = B_ & 0x02;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_1_C(){
+	BYTE n = C_ & 0x02;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_1_D(){
+	BYTE n = D_ & 0x02;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_1_E(){
+	BYTE n = E_ & 0x02;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_1_H(){
+	BYTE n = H_ & 0x02;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_1_L(){
+	BYTE n = L_ & 0x02;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_1_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	n = n & 0x02;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 16;
+}
+
+void CPU::BIT_1_A(){
+	BYTE n = A_ & 0x02;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
 
 // 50
-void CPU::BIT_2_B(){ }
-void CPU::BIT_2_C(){ }
-void CPU::BIT_2_D(){ }
-void CPU::BIT_2_E(){ }
-void CPU::BIT_2_H(){ }
-void CPU::BIT_2_L(){ }
-void CPU::BIT_2_pHL(){ }
-void CPU::BIT_2_A(){ }
-void CPU::BIT_3_B(){ }
-void CPU::BIT_3_C(){ }
-void CPU::BIT_3_D(){ }
-void CPU::BIT_3_E(){ }
-void CPU::BIT_3_H(){ }
-void CPU::BIT_3_L(){ }
-void CPU::BIT_3_pHL(){ }
-void CPU::BIT_3_A(){ }
+void CPU::BIT_2_B(){
+	BYTE n = B_ & 0x04;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_2_C(){
+	BYTE n = C_ & 0x04;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_2_D(){
+	BYTE n = D_ & 0x04;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_2_E(){
+	BYTE n = E_ & 0x04;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_2_H(){
+	BYTE n = H_ & 0x04;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_2_L(){
+	BYTE n = L_ & 0x04;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_2_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	n = n & 0x04;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 16;
+}
+
+void CPU::BIT_2_A(){
+	BYTE n = A_ & 0x04;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_3_B(){
+	BYTE n = B_ & 0x08;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_3_C(){
+	BYTE n = C_ & 0x08;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_3_D(){
+	BYTE n = D_ & 0x08;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_3_E(){
+	BYTE n = E_ & 0x08;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_3_H(){
+	BYTE n = H_ & 0x08;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_3_L(){
+	BYTE n = L_ & 0x08;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_3_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	n = n & 0x08;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 16;
+}
+
+void CPU::BIT_3_A(){
+	BYTE n = A_ & 0x08;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
 
 // 60
-void CPU::BIT_4_B(){ }
-void CPU::BIT_4_C(){ }
-void CPU::BIT_4_D(){ }
-void CPU::BIT_4_E(){ }
-void CPU::BIT_4_H(){ }
-void CPU::BIT_4_L(){ }
-void CPU::BIT_4_pHL(){ }
-void CPU::BIT_4_A(){ }
-void CPU::BIT_5_B(){ }
-void CPU::BIT_5_C(){ }
-void CPU::BIT_5_D(){ }
-void CPU::BIT_5_E(){ }
-void CPU::BIT_5_H(){ }
-void CPU::BIT_5_L(){ }
-void CPU::BIT_5_pHL(){ }
-void CPU::BIT_5_A(){ }
+void CPU::BIT_4_B(){
+	BYTE n = B_ & 0x10;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_4_C(){
+	BYTE n = C_ & 0x10;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_4_D(){
+	BYTE n = D_ & 0x10;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_4_E(){
+	BYTE n = E_ & 0x10;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_4_H(){
+	BYTE n = H_ & 0x10;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_4_L(){
+	BYTE n = L_ & 0x10;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_4_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	n = n & 0x10;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 16;
+}
+
+void CPU::BIT_4_A(){
+	BYTE n = A_ & 0x10;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_5_B(){
+	BYTE n = B_ & 0x20;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_5_C(){
+	BYTE n = C_ & 0x20;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_5_D(){
+	BYTE n = D_ & 0x20;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_5_E(){
+	BYTE n = E_ & 0x20;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_5_H(){
+	BYTE n = H_ & 0x20;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_5_L(){
+	BYTE n = L_ & 0x20;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_5_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	n = n & 0x20;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 16;
+}
+
+void CPU::BIT_5_A(){
+	BYTE n = A_ & 0x20;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
 
 // 70
-void CPU::BIT_6_B(){ }
-void CPU::BIT_6_C(){ }
-void CPU::BIT_6_D(){ }
-void CPU::BIT_6_E(){ }
-void CPU::BIT_6_H(){ }
-void CPU::BIT_6_L(){ }
-void CPU::BIT_6_pHL(){ }
-void CPU::BIT_6_A(){ }
-void CPU::BIT_7_B(){ }
-void CPU::BIT_7_C(){ }
-void CPU::BIT_7_D(){ }
-void CPU::BIT_7_E(){ }
-void CPU::BIT_7_H(){ }
-void CPU::BIT_7_L(){ }
-void CPU::BIT_7_pHL(){ }
-void CPU::BIT_7_A(){ }
+void CPU::BIT_6_B(){
+	BYTE n = B_ & 0x40;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_6_C(){
+	BYTE n = C_ & 0x40;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_6_D(){
+	BYTE n = D_ & 0x40;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_6_E(){
+	BYTE n = E_ & 0x40;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_6_H(){
+	BYTE n = H_ & 0x40;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_6_L(){
+	BYTE n = L_ & 0x40;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_6_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	n = n & 0x40;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 16;
+}
+
+void CPU::BIT_6_A(){
+	BYTE n = A_ & 0x40;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_7_B(){
+	BYTE n = B_ & 0x80;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_7_C(){
+	BYTE n = C_ & 0x80;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_7_D(){
+	BYTE n = D_ & 0x80;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_7_E(){
+	BYTE n = E_ & 0x80;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_7_H(){
+	BYTE n = H_ & 0x80;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_7_L(){
+	BYTE n = L_ & 0x80;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
+
+void CPU::BIT_7_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+	n = n & 0x80;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 16;
+}
+
+void CPU::BIT_7_A(){
+	BYTE n = A_ & 0x80;
+
+	if (n)
+		F_ &= !(0x80);
+	else
+		F_ |= 0x80;
+
+	F_ &= !(0x60);
+
+	cycles_done_ = 8;
+}
 
 // 80
-void CPU::RES_0_B(){ }
-void CPU::RES_0_C(){ }
-void CPU::RES_0_D(){ }
-void CPU::RES_0_E(){ }
-void CPU::RES_0_H(){ }
-void CPU::RES_0_L(){ }
-void CPU::RES_0_pHL(){ }
-void CPU::RES_0_A(){ }
-void CPU::RES_1_B(){ }
-void CPU::RES_1_C(){ }
-void CPU::RES_1_D(){ }
-void CPU::RES_1_E(){ }
-void CPU::RES_1_H(){ }
-void CPU::RES_1_L(){ }
-void CPU::RES_1_pHL(){ }
-void CPU::RES_1_A(){ }
+void CPU::RES_0_B(){
+	B_ &= !(0x01);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_0_C(){
+	C_ &= !(0x01);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_0_D(){
+	D_ &= !(0x01);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_0_E(){
+	E_ &= !(0x01);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_0_H(){
+	H_ &= !(0x01);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_0_L(){
+	L_ &= !(0x01);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_0_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n &= !(0x01);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RES_0_A(){
+	A_ &= !(0x01);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_1_B(){
+	B_ &= !(0x02);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_1_C(){
+	C_ &= !(0x02);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_1_D(){
+	D_ &= !(0x02);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_1_E(){
+	E_ &= !(0x02);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_1_H(){
+	H_ &= !(0x02);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_1_L(){
+	L_ &= !(0x02);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_1_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n &= !(0x02);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RES_1_A(){
+	A_ &= !(0x02);
+
+	cycles_done_ = 8;
+}
 
 // 90
-void CPU::RES_2_B(){ }
-void CPU::RES_2_C(){ }
-void CPU::RES_2_D(){ }
-void CPU::RES_2_E(){ }
-void CPU::RES_2_H(){ }
-void CPU::RES_2_L(){ }
-void CPU::RES_2_pHL(){ }
-void CPU::RES_2_A(){ }
-void CPU::RES_3_B(){ }
-void CPU::RES_3_C(){ }
-void CPU::RES_3_D(){ }
-void CPU::RES_3_E(){ }
-void CPU::RES_3_H(){ }
-void CPU::RES_3_L(){ }
-void CPU::RES_3_pHL(){ }
-void CPU::RES_3_A(){ }
+void CPU::RES_2_B(){
+	B_ &= !(0x04);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_2_C(){
+	C_ &= !(0x04);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_2_D(){
+	D_ &= !(0x04);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_2_E(){
+	E_ &= !(0x04);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_2_H(){
+	H_ &= !(0x04);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_2_L(){
+	L_ &= !(0x04);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_2_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n &= !(0x04);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RES_2_A(){
+	A_ &= !(0x04);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_3_B(){
+	B_ &= !(0x08);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_3_C(){
+	C_ &= !(0x08);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_3_D(){
+	D_ &= !(0x08);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_3_E(){
+	E_ &= !(0x08);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_3_H(){
+	H_ &= !(0x08);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_3_L(){
+	L_ &= !(0x08);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_3_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n &= !(0x08);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RES_3_A(){
+	A_ &= !(0x08);
+
+	cycles_done_ = 8;
+}
 
 // A0
-void CPU::RES_4_B(){ }
-void CPU::RES_4_C(){ }
-void CPU::RES_4_D(){ }
-void CPU::RES_4_E(){ }
-void CPU::RES_4_H(){ }
-void CPU::RES_4_L(){ }
-void CPU::RES_4_pHL(){ }
-void CPU::RES_4_A(){ }
-void CPU::RES_5_B(){ }
-void CPU::RES_5_C(){ }
-void CPU::RES_5_D(){ }
-void CPU::RES_5_E(){ }
-void CPU::RES_5_H(){ }
-void CPU::RES_5_L(){ }
-void CPU::RES_5_pHL(){ }
-void CPU::RES_5_A(){ }
+void CPU::RES_4_B(){
+	B_ &= !(0x10);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_4_C(){
+	C_ &= !(0x10);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_4_D(){
+	D_ &= !(0x10);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_4_E(){
+	E_ &= !(0x10);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_4_H(){
+	H_ &= !(0x10);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_4_L(){
+	L_ &= !(0x10);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_4_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n &= !(0x10);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RES_4_A(){
+	A_ &= !(0x10);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_5_B(){
+	B_ &= !(0x20);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_5_C(){
+	C_ &= !(0x20);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_5_D(){
+	D_ &= !(0x20);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_5_E(){
+	E_ &= !(0x20);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_5_H(){
+	H_ &= !(0x20);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_5_L(){
+	L_ &= !(0x20);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_5_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n &= !(0x20);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RES_5_A(){
+	A_ &= !(0x20);
+
+	cycles_done_ = 8;
+}
 
 // B0
-void CPU::RES_6_B(){ }
-void CPU::RES_6_C(){ }
-void CPU::RES_6_D(){ }
-void CPU::RES_6_E(){ }
-void CPU::RES_6_H(){ }
-void CPU::RES_6_L(){ }
-void CPU::RES_6_pHL(){ }
-void CPU::RES_6_A(){ }
-void CPU::RES_7_B(){ }
-void CPU::RES_7_C(){ }
-void CPU::RES_7_D(){ }
-void CPU::RES_7_E(){ }
-void CPU::RES_7_H(){ }
-void CPU::RES_7_L(){ }
-void CPU::RES_7_pHL(){ }
-void CPU::RES_7_A(){ }
+void CPU::RES_6_B(){
+	B_ &= !(0x40);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_6_C(){
+	C_ &= !(0x40);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_6_D(){
+	D_ &= !(0x40);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_6_E(){
+	E_ &= !(0x40);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_6_H(){
+	H_ &= !(0x40);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_6_L(){
+	L_ &= !(0x40);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_6_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n &= !(0x40);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RES_6_A(){
+	A_ &= !(0x40);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_7_B(){
+	B_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_7_C(){
+	C_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_7_D(){
+	D_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_7_E(){
+	E_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_7_H(){
+	H_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_7_L(){
+	L_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
+
+void CPU::RES_7_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n &= !(0x80);
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::RES_7_A(){
+	A_ &= !(0x80);
+
+	cycles_done_ = 8;
+}
 
 // C0
-void CPU::SET_0_B(){ }
-void CPU::SET_0_C(){ }
-void CPU::SET_0_D(){ }
-void CPU::SET_0_E(){ }
-void CPU::SET_0_H(){ }
-void CPU::SET_0_L(){ }
-void CPU::SET_0_pHL(){ }
-void CPU::SET_0_A(){ }
-void CPU::SET_1_B(){ }
-void CPU::SET_1_C(){ }
-void CPU::SET_1_D(){ }
-void CPU::SET_1_E(){ }
-void CPU::SET_1_H(){ }
-void CPU::SET_1_L(){ }
-void CPU::SET_1_pHL(){ }
-void CPU::SET_1_A(){ }
+void CPU::SET_0_B(){
+	B_ |= 0x01;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_0_C(){
+	C_ |= 0x01;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_0_D(){
+	D_ |= 0x01;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_0_E(){
+	E_ |= 0x01;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_0_H(){
+	H_ |= 0x01;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_0_L(){
+	L_ |= 0x01;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_0_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n |= 0x01;
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SET_0_A(){
+	A_ |= 0x01;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_1_B(){
+	B_ |= 0x02;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_1_C(){
+	C_ |= 0x02;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_1_D(){
+	D_ |= 0x02;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_1_E(){
+	E_ |= 0x02;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_1_H(){
+	H_ |= 0x02;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_1_L(){
+	L_ |= 0x02;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_1_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n |= 0x02;
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SET_1_A(){
+	A_ |= 0x02;
+
+	cycles_done_ = 8;
+}
 
 // D0
-void CPU::SET_2_B(){ }
-void CPU::SET_2_C(){ }
-void CPU::SET_2_D(){ }
-void CPU::SET_2_E(){ }
-void CPU::SET_2_H(){ }
-void CPU::SET_2_L(){ }
-void CPU::SET_2_pHL(){ }
-void CPU::SET_2_A(){ }
-void CPU::SET_3_B(){ }
-void CPU::SET_3_C(){ }
-void CPU::SET_3_D(){ }
-void CPU::SET_3_E(){ }
-void CPU::SET_3_H(){ }
-void CPU::SET_3_L(){ }
-void CPU::SET_3_pHL(){ }
-void CPU::SET_3_A(){ }
+void CPU::SET_2_B(){
+	B_ |= 0x04;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_2_C(){
+	C_ |= 0x04;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_2_D(){
+	D_ |= 0x04;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_2_E(){
+	E_ |= 0x04;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_2_H(){
+	H_ |= 0x04;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_2_L(){
+	L_ |= 0x04;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_2_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n |= 0x04;
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SET_2_A(){
+	A_ |= 0x04;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_3_B(){
+	B_ |= 0x08;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_3_C(){
+	C_ |= 0x08;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_3_D(){
+	D_ |= 0x08;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_3_E(){
+	E_ |= 0x08;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_3_H(){
+	H_ |= 0x08;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_3_L(){
+	L_ |= 0x08;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_3_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n |= 0x08;
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SET_3_A(){
+	A_ |= 0x08;
+
+	cycles_done_ = 8;
+}
 
 // E0
-void CPU::SET_4_B(){ }
-void CPU::SET_4_C(){ }
-void CPU::SET_4_D(){ }
-void CPU::SET_4_E(){ }
-void CPU::SET_4_H(){ }
-void CPU::SET_4_L(){ }
-void CPU::SET_4_pHL(){ }
-void CPU::SET_4_A(){ }
-void CPU::SET_5_B(){ }
-void CPU::SET_5_C(){ }
-void CPU::SET_5_D(){ }
-void CPU::SET_5_E(){ }
-void CPU::SET_5_H(){ }
-void CPU::SET_5_L(){ }
-void CPU::SET_5_pHL(){ }
-void CPU::SET_5_A(){ }
+void CPU::SET_4_B(){
+	B_ |= 0x10;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_4_C(){
+	C_ |= 0x10;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_4_D(){
+	D_ |= 0x10;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_4_E(){
+	E_ |= 0x10;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_4_H(){
+	H_ |= 0x10;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_4_L(){
+	L_ |= 0x10;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_4_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n |= 0x10;
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SET_4_A(){
+	A_ |= 0x10;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_5_B(){
+	B_ |= 0x20;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_5_C(){
+	C_ |= 0x20;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_5_D(){
+	D_ |= 0x20;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_5_E(){
+	B_ |= 0x20;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_5_H(){
+	B_ |= 0x20;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_5_L(){
+	L_ |= 0x20;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_5_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n |= 0x20;
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SET_5_A(){
+	A_ |= 0x20;
+
+	cycles_done_ = 8;
+}
 
 // F0
-void CPU::SET_6_B(){ }
-void CPU::SET_6_C(){ }
-void CPU::SET_6_D(){ }
-void CPU::SET_6_E(){ }
-void CPU::SET_6_H(){ }
-void CPU::SET_6_L(){ }
-void CPU::SET_6_pHL(){ }
-void CPU::SET_6_A(){ }
-void CPU::SET_7_B(){ }
-void CPU::SET_7_C(){ }
-void CPU::SET_7_D(){ }
-void CPU::SET_7_E(){ }
-void CPU::SET_7_H(){ }
-void CPU::SET_7_L(){ }
-void CPU::SET_7_pHL(){ }
-void CPU::SET_7_A(){ }
+void CPU::SET_6_B(){
+	B_ |= 0x40;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_6_C(){
+	C_ |= 0x40;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_6_D(){
+	D_ |= 0x40;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_6_E(){
+	E_ |= 0x40;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_6_H(){
+	H_ |= 0x40;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_6_L(){
+	L_ |= 0x40;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_6_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n |= 0x40;
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SET_6_A(){
+	A_ |= 0x40;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_7_B(){
+	B_ |= 0x80;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_7_C(){
+	C_ |= 0x80;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_7_D(){
+	D_ |= 0x80;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_7_E(){
+	E_ |= 0x80;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_7_H(){
+	H_ |= 0x80;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_7_L(){
+	L_ |= 0x80;
+
+	cycles_done_ = 8;
+}
+
+void CPU::SET_7_pHL(){
+	WORD address = (H_ << 8) | L_;
+	BYTE n; mmu_->readByte(address, n);
+
+	n |= 0x80;
+
+	mmu_->writeByte(address, n);
+
+	cycles_done_ = 16;
+}
+
+void CPU::SET_7_A(){
+	A_ |= 0x80;
+
+	cycles_done_ = 8;
+}
+
+void CPU::test() {
+	BYTE b = 0x80, c = b >> 1;
+	std::cout << std::hex << (int)c << "\n";
+}

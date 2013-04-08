@@ -17,6 +17,7 @@ public:
 
 	void handleInterrupts();
 	int run();
+	void test(); // will hold what i'm currently testing on the CPU
 
 private:
 	HeaderInfo *hi_;
