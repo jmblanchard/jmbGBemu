@@ -7,6 +7,7 @@
 #define _EMULATOR_H
 
 #include <string>
+#include <SDL.h>
 
 #include "definitions.h"
 #include "HeaderInfo.h"
@@ -45,6 +46,13 @@ private:
 	int timer_mode_clocks_[4];
 	bool timer_running_;
 
+	SDL_Event evnt;
+	SDL_Surface *screen;
+
+	// SDL Timer for frame rate cap
+	uint32_t start_ticks_;
+
+	void handleInput();
 	void spinUntilNextFrame();
 };
 

@@ -210,21 +210,67 @@ CPU::CPU(MMU *mmu, Emulator *emu, HeaderInfo *hi) {
 	SP_ = 0xFFFE;
 	PC_ = 0x100;
 	cycles_done_ = 0;
+	halted_ = false;
 }
 
 CPU::~CPU() { }
 
 void CPU::handleInterrupts() {
+	BYTE in_flag;
+	mmu_->readByte(0xFF0F, in_flag);
+
+	// are interrupts enabled, and do we have any requests
+	if (mmu_->ime_ && in_flag != 0x00) {
+		BYTE in_enable;
+		mmu_->readByte(0xFFFF, in_enable);
+
+		// check and see if the interrupt has individually been enabled.
+		// this takes into account interrupt priority
+		if (in_enable & 0x01 && in_flag & 0x01) {
+			// V-Blank
+			mmu_->ime_ = false;
+			in_flag &= ~(0x01); // clear the interrupt flag we're handling
+			mmu_->writeByte(0xFF0F, in_flag);
+			SP_ -= 2; // push PC_ onto the stack and set it to correct address
+			mmu_->writeWord(SP_, PC_);
+			PC_ = 0x40;
+		} else if (in_enable & 0x02 && in_flag & 0x02) {
+			// LCD STAT
+			mmu_->ime_ = false;
+			in_flag &= ~(0x02); // clear the interrupt flag we're handling
+			mmu_->writeByte(0xFF0F, in_flag);
+			SP_ -= 2; // push PC_ onto the stack and set it to correct address
+			mmu_->writeWord(SP_, PC_);
+			PC_ = 0x48;
+		} else if (in_enable & 0x04 && in_flag & 0x04) {
+			// Timer
+			mmu_->ime_ = false;
+			in_flag &= ~(0x04); // clear the interrupt flag we're handling
+			mmu_->writeByte(0xFF0F, in_flag);
+			SP_ -= 2; // push PC_ onto the stack and set it to correct address
+			mmu_->writeWord(SP_, PC_);
+			PC_ = 0x50;
+		} else if (in_enable & 0x08 && in_flag & 0x08) {
+			// Serial - WON'T USE
+		} else if (in_enable & 0x10 && in_flag & 0x10) {
+			// Joypad
+			mmu_->ime_ = false;
+			in_flag &= ~(0x10); // clear the interrupt flag we're handling
+			mmu_->writeByte(0xFF0F, in_flag);
+			SP_ -= 2; // push PC_ onto the stack and set it to correct address
+			mmu_->writeWord(SP_, PC_);
+			PC_ = 0x60;
+		}
+	}
 }
 
 int CPU::run() {
 	// fetch
 	if (!halted_) {
-		BYTE curr_op;
 		mmu_->readByte(PC_++, curr_op);
 
 		// decode and execute
-		opcodes_[curr_op];
+		(this->*opcodes_[curr_op])();
 
 		return cycles_done_;
 	} else {
@@ -271,7 +317,7 @@ void CPU::INC_B(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	if ((B_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
 
@@ -307,14 +353,14 @@ void CPU::RLCA(){
 	if (oldCarry)
 		A_ |= oldCarry;
 	else
-		A_ &= !(oldCarry);
+		A_ &= ~(oldCarry);
 
 	if (newCarry)
 		F_ |= newCarry;
 	else
-		F_ &= !(newCarry);
+		F_ &= ~(newCarry);
 
-	F_ &= !(0xE0); // reset other flags
+	F_ &= ~(0xE0); // reset other flags
 
 	cycles_done_ = 4;
 }
@@ -337,7 +383,7 @@ void CPU::ADD_HL_BC(){
 	// did we have a carry?
 	if (sum < hl && sum < bc)
 		F_ |= 0x10;
-	F_ &= !(0x40); // reset N
+	F_ &= ~(0x40); // reset N
 	// not implementing H flag
 	H_ = sum >> 8;
 	L_ = sum & 0xFF;
@@ -366,7 +412,7 @@ void CPU::INC_C(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	if ((C_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
 
@@ -403,14 +449,14 @@ void CPU::RRCA(){
 	if (oldCarry)
 		A_ |= 0x80;
 	else
-		A_ &= !(0x80);
+		A_ &= ~(0x80);
 
 	if (newCarry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0xE0); // reset other flags
+	F_ &= ~(0xE0); // reset other flags
 
 	cycles_done_ = 4;
 }
@@ -450,7 +496,7 @@ void CPU::INC_D(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	if ((D_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
 
@@ -487,11 +533,11 @@ void CPU::RLA(){
 		A_ |= newCarry >> 4;
 		F_ |= newCarry;
 	} else {
-		A_ &= !(newCarry >> 4);
-		F_ &= !(newCarry);
+		A_ &= ~(newCarry >> 4);
+		F_ &= ~(newCarry);
 	}
 
-	F_ &= !(0xE0); // reset other flags
+	F_ &= ~(0xE0); // reset other flags
 
 	cycles_done_ = 4;
 }
@@ -513,7 +559,7 @@ void CPU::ADD_HL_DE(){
 	// did we have a carry?
 	if (sum < hl && sum < de)
 		F_ |= 0x10;
-	F_ &= !(0x40); // reset N
+	F_ &= ~(0x40); // reset N
 	// not implementing H flag
 	H_ = sum >> 8;
 	L_ = sum & 0xFF;
@@ -542,7 +588,7 @@ void CPU::INC_E(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	if ((E_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
 
@@ -579,8 +625,8 @@ void CPU::RRA(){
 		A_ |= 0x01;
 		F_ |= 0x10;
 	} else {
-		A_ &= !(0x01);
-		F_ &= !(0x10);
+		A_ &= ~(0x01);
+		F_ &= ~(0x10);
 	}
 
 	cycles_done_ = 4;
@@ -632,7 +678,7 @@ void CPU::INC_H(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	if ((H_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
 
@@ -687,7 +733,7 @@ void CPU::ADD_HL_HL(){
 	// did we have a carry?
 	if (sum < hl)
 		F_ |= 0x10;
-	F_ &= !(0x40); // reset N
+	F_ &= ~(0x40); // reset N
 	// not implementing H flag
 	H_ = sum >> 8;
 	L_ = sum & 0xFF;
@@ -718,7 +764,7 @@ void CPU::INC_L(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	if ((L_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
 
@@ -803,10 +849,10 @@ void CPU::INC_pHL(){
 	if (b == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// N flag
-	F_ &= !(0x40);
+	F_ &= ~(0x40);
 
 	// HALF CARRY FLAG SHOULD BE SET BUT I'M SKIPPING UNLESS I NEED TO DO DAA
 
@@ -824,7 +870,7 @@ void CPU::DEC_pHL(){
 	if (b == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// N flag
 	F_ |= 0x40;
@@ -844,7 +890,7 @@ void CPU::LD_pHL_n(){
 }
 
 void CPU::SCF(){
-	F_ &= !(0x60); // reset N and H
+	F_ &= ~(0x60); // reset N and H
 	F_ |= 0x10; // set carry flag
 
 	cycles_done_ = 4;
@@ -870,7 +916,7 @@ void CPU::ADD_HL_SP(){
 	// did we have a carry?
 	if (sum < hl && sum < SP_)
 		F_ |= 0x10;
-	F_ &= !(0x40); // reset N
+	F_ &= ~(0x40); // reset N
 	// not implementing H flag
 	H_ = sum >> 8;
 	L_ = sum & 0xFF;
@@ -898,7 +944,7 @@ void CPU::INC_A(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	if ((A_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
 
@@ -929,7 +975,7 @@ void CPU::LD_A_n(){
 
 void CPU::CCF(){
 	A_ ^= 0xFF;
-	F_ &= !(0x60); // reset the N and H flags
+	F_ &= ~(0x60); // reset the N and H flags
 	F_ ^= 0x10;
 
 	cycles_done_ = 4;
@@ -1345,19 +1391,19 @@ void CPU::LD_A_A(){
 void CPU::ADD_A_B(){
 	BYTE sum = A_ + B_;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum < A_ && sum < B_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1367,19 +1413,19 @@ void CPU::ADD_A_B(){
 void CPU::ADD_A_C(){
 	BYTE sum = A_ + C_;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum < A_ && sum < C_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1389,19 +1435,19 @@ void CPU::ADD_A_C(){
 void CPU::ADD_A_D(){
 	BYTE sum = A_ + D_;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum < A_ && sum < D_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1411,19 +1457,19 @@ void CPU::ADD_A_D(){
 void CPU::ADD_A_E(){
 	BYTE sum = A_ + E_;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum < A_ && sum < E_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1433,19 +1479,19 @@ void CPU::ADD_A_E(){
 void CPU::ADD_A_H(){
 	BYTE sum = A_ + H_;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum < A_ && sum < H_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1455,19 +1501,19 @@ void CPU::ADD_A_H(){
 void CPU::ADD_A_L(){
 	BYTE sum = A_ + L_;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum < A_ && sum < L_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1479,19 +1525,19 @@ void CPU::ADD_A_pHL(){
 	BYTE n; mmu_->readByte(address, n);
 	BYTE sum = A_ + n;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum < A_ && sum < n)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1501,19 +1547,19 @@ void CPU::ADD_A_pHL(){
 void CPU::ADD_A_A(){
 	BYTE sum = A_ + A_;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum < A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1529,19 +1575,19 @@ void CPU::ADC_A_B(){
 
 	BYTE sum = A_ + B_ + carry;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum <= A_ && sum <= B_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1557,19 +1603,19 @@ void CPU::ADC_A_C(){
 
 	BYTE sum = A_ + C_ + carry;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum <= A_ && sum <= C_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1585,19 +1631,19 @@ void CPU::ADC_A_D(){
 
 	BYTE sum = A_ + D_ + carry;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum <= A_ && sum <= D_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1613,19 +1659,19 @@ void CPU::ADC_A_E(){
 
 	BYTE sum = A_ + E_ + carry;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum <= A_ && sum <= E_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1641,19 +1687,19 @@ void CPU::ADC_A_H(){
 
 	BYTE sum = A_ + H_ + carry;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum <= A_ && sum <= H_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1669,19 +1715,19 @@ void CPU::ADC_A_L(){
 
 	BYTE sum = A_ + L_ + carry;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum <= A_ && sum <= L_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1700,19 +1746,19 @@ void CPU::ADC_A_pHL(){
 
 	BYTE sum = A_ + n + carry;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum <= A_ && sum <= n)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1728,19 +1774,19 @@ void CPU::ADC_A_A(){
 
 	BYTE sum = A_ + A_ + carry;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum <= A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -1757,13 +1803,13 @@ void CPU::SUB_B(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (B_ > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -1779,13 +1825,13 @@ void CPU::SUB_C(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (C_ > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -1801,13 +1847,13 @@ void CPU::SUB_D(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (D_ > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -1823,13 +1869,13 @@ void CPU::SUB_E(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (E_ > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -1845,13 +1891,13 @@ void CPU::SUB_H(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (H_ > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -1867,13 +1913,13 @@ void CPU::SUB_L(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (L_ > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -1891,13 +1937,13 @@ void CPU::SUB_pHL(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (n > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -1913,13 +1959,13 @@ void CPU::SUB_A(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (A_ > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -1941,13 +1987,13 @@ void CPU::SBC_A_B(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if ((B_+carry) > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -1969,13 +2015,13 @@ void CPU::SBC_A_C(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if ((C_+carry) > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -1997,13 +2043,13 @@ void CPU::SBC_A_D(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if ((D_+carry) > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -2025,13 +2071,13 @@ void CPU::SBC_A_E(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if ((E_+carry) > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -2053,13 +2099,13 @@ void CPU::SBC_A_H(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if ((H_+carry) > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -2081,13 +2127,13 @@ void CPU::SBC_A_L(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if ((L_+carry) > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -2111,13 +2157,13 @@ void CPU::SBC_A_pHL(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if ((n+carry) > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -2139,13 +2185,13 @@ void CPU::SBC_A_A(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if ((A_+carry) > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -2159,9 +2205,9 @@ void CPU::AND_B(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x50);
+	F_ &= ~(0x50);
 
 	cycles_done_ = 4;
 }
@@ -2172,9 +2218,9 @@ void CPU::AND_C(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x50);
+	F_ &= ~(0x50);
 
 	cycles_done_ = 4;
 }
@@ -2185,9 +2231,9 @@ void CPU::AND_D(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x50);
+	F_ &= ~(0x50);
 
 	cycles_done_ = 4;
 }
@@ -2198,9 +2244,9 @@ void CPU::AND_E(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x50);
+	F_ &= ~(0x50);
 
 	cycles_done_ = 4;
 }
@@ -2211,9 +2257,9 @@ void CPU::AND_H(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x50);
+	F_ &= ~(0x50);
 
 	cycles_done_ = 4;
 }
@@ -2224,9 +2270,9 @@ void CPU::AND_L(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x50);
+	F_ &= ~(0x50);
 
 	cycles_done_ = 4;
 }
@@ -2239,9 +2285,9 @@ void CPU::AND_pHL(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x50);
+	F_ &= ~(0x50);
 
 	cycles_done_ = 8;
 }
@@ -2252,9 +2298,9 @@ void CPU::AND_A(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x50);
+	F_ &= ~(0x50);
 
 	cycles_done_ = 4;
 }
@@ -2265,9 +2311,9 @@ void CPU::XOR_B(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset all flags
+	F_ &= ~(0x70); // reset all flags
 
 	cycles_done_ = 4;
 }
@@ -2278,9 +2324,9 @@ void CPU::XOR_C(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset all flags
+	F_ &= ~(0x70); // reset all flags
 
 	cycles_done_ = 4;
 }
@@ -2291,9 +2337,9 @@ void CPU::XOR_D(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset all flags
+	F_ &= ~(0x70); // reset all flags
 
 	cycles_done_ = 4;
 }
@@ -2304,9 +2350,9 @@ void CPU::XOR_E(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset all flags
+	F_ &= ~(0x70); // reset all flags
 
 	cycles_done_ = 4;
 }
@@ -2317,9 +2363,9 @@ void CPU::XOR_H(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset all flags
+	F_ &= ~(0x70); // reset all flags
 
 	cycles_done_ = 4;
 }
@@ -2330,9 +2376,9 @@ void CPU::XOR_L(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset all flags
+	F_ &= ~(0x70); // reset all flags
 
 	cycles_done_ = 4;
 }
@@ -2345,9 +2391,9 @@ void CPU::XOR_pHL(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset all flags
+	F_ &= ~(0x70); // reset all flags
 
 	cycles_done_ = 8;
 }
@@ -2358,9 +2404,9 @@ void CPU::XOR_A(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset all flags
+	F_ &= ~(0x70); // reset all flags
 
 	cycles_done_ = 4;
 }
@@ -2372,9 +2418,9 @@ void CPU::OR_B(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset flags
+	F_ &= ~(0x70); // reset flags
 
 	cycles_done_ = 4;
 }
@@ -2385,9 +2431,9 @@ void CPU::OR_C(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset flags
+	F_ &= ~(0x70); // reset flags
 
 	cycles_done_ = 4;
 }
@@ -2398,9 +2444,9 @@ void CPU::OR_D(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset flags
+	F_ &= ~(0x70); // reset flags
 
 	cycles_done_ = 4;
 }
@@ -2411,9 +2457,9 @@ void CPU::OR_E(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset flags
+	F_ &= ~(0x70); // reset flags
 
 	cycles_done_ = 4;
 }
@@ -2424,9 +2470,9 @@ void CPU::OR_H(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset flags
+	F_ &= ~(0x70); // reset flags
 
 	cycles_done_ = 4;
 }
@@ -2437,9 +2483,9 @@ void CPU::OR_L(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset flags
+	F_ &= ~(0x70); // reset flags
 
 	cycles_done_ = 4;
 }
@@ -2452,9 +2498,9 @@ void CPU::OR_pHL(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset flags
+	F_ &= ~(0x70); // reset flags
 
 	cycles_done_ = 8;
 }
@@ -2465,9 +2511,9 @@ void CPU::OR_A(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset flags
+	F_ &= ~(0x70); // reset flags
 
 	cycles_done_ = 4;
 }
@@ -2476,12 +2522,12 @@ void CPU::CP_B(){
 	if (A_ == B_) {
 		F_ |= 0x80;
 		F_ |= 0x40;
-		F_ &= !(0x30);
+		F_ &= ~(0x30);
 	} else if (A_ < B_) {
 		F_ |= 0x10;
-		F_ &= !(0xE0);
+		F_ &= ~(0xE0);
 	} else {
-		F_ &= !(0xF0);
+		F_ &= ~(0xF0);
 	}
 
 	cycles_done_ = 4;
@@ -2491,12 +2537,12 @@ void CPU::CP_C(){
 	if (A_ == C_) {
 		F_ |= 0x80;
 		F_ |= 0x40;
-		F_ &= !(0x30);
+		F_ &= ~(0x30);
 	} else if (A_ < C_) {
 		F_ |= 0x10;
-		F_ &= !(0xE0);
+		F_ &= ~(0xE0);
 	} else {
-		F_ &= !(0xF0);
+		F_ &= ~(0xF0);
 	}
 
 	cycles_done_ = 4;
@@ -2506,12 +2552,12 @@ void CPU::CP_D(){
 	if (A_ == D_) {
 		F_ |= 0x80;
 		F_ |= 0x40;
-		F_ &= !(0x30);
+		F_ &= ~(0x30);
 	} else if (A_ < D_) {
 		F_ |= 0x10;
-		F_ &= !(0xE0);
+		F_ &= ~(0xE0);
 	} else {
-		F_ &= !(0xF0);
+		F_ &= ~(0xF0);
 	}
 
 	cycles_done_ = 4;
@@ -2521,12 +2567,12 @@ void CPU::CP_E(){
 	if (A_ == E_) {
 		F_ |= 0x80;
 		F_ |= 0x40;
-		F_ &= !(0x30);
+		F_ &= ~(0x30);
 	} else if (A_ < E_) {
 		F_ |= 0x10;
-		F_ &= !(0xE0);
+		F_ &= ~(0xE0);
 	} else {
-		F_ &= !(0xF0);
+		F_ &= ~(0xF0);
 	}
 
 	cycles_done_ = 4;
@@ -2536,12 +2582,12 @@ void CPU::CP_H(){
 	if (A_ == H_) {
 		F_ |= 0x80;
 		F_ |= 0x40;
-		F_ &= !(0x30);
+		F_ &= ~(0x30);
 	} else if (A_ < H_) {
 		F_ |= 0x10;
-		F_ &= !(0xE0);
+		F_ &= ~(0xE0);
 	} else {
-		F_ &= !(0xF0);
+		F_ &= ~(0xF0);
 	}
 
 	cycles_done_ = 4;
@@ -2551,12 +2597,12 @@ void CPU::CP_L(){
 	if (A_ == L_) {
 		F_ |= 0x80;
 		F_ |= 0x40;
-		F_ &= !(0x30);
+		F_ &= ~(0x30);
 	} else if (A_ < L_) {
 		F_ |= 0x10;
-		F_ &= !(0xE0);
+		F_ &= ~(0xE0);
 	} else {
-		F_ &= !(0xF0);
+		F_ &= ~(0xF0);
 	}
 
 	cycles_done_ = 4;
@@ -2568,12 +2614,12 @@ void CPU::CL_pHL(){
 	if (A_ == n) {
 		F_ |= 0x80;
 		F_ |= 0x40;
-		F_ &= !(0x30);
+		F_ &= ~(0x30);
 	} else if (A_ < n) {
 		F_ |= 0x10;
-		F_ &= !(0xE0);
+		F_ &= ~(0xE0);
 	} else {
-		F_ &= !(0xF0);
+		F_ &= ~(0xF0);
 	}
 
 	cycles_done_ = 8;
@@ -2583,12 +2629,12 @@ void CPU::CP_A(){
 	if (A_ == A_) {
 		F_ |= 0x80;
 		F_ |= 0x40;
-		F_ &= !(0x30);
+		F_ &= ~(0x30);
 	} else if (A_ < A_) {
 		F_ |= 0x10;
-		F_ &= !(0xE0);
+		F_ &= ~(0xE0);
 	} else {
-		F_ &= !(0xF0);
+		F_ &= ~(0xF0);
 	}
 
 	cycles_done_ = 4;
@@ -2666,19 +2712,19 @@ void CPU::ADD_A_n(){
 
 	BYTE sum = A_ + n;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum <= A_ && sum <= n)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -2728,7 +2774,7 @@ void CPU::PREFIX_CB(){
 	mmu_->readByte(PC_++, curr_op);
 
 	// decode and execute
-	cb_opcodes_[curr_op];
+	(this->*cb_opcodes_[curr_op])();
 }
 
 void CPU::CALL_Z_pnn(){
@@ -2770,19 +2816,19 @@ void CPU::ADC_A_n(){
 
 	BYTE sum = A_ + n + carry;
 
-	F_ &= !(0x40); // reset N flag
+	F_ &= ~(0x40); // reset N flag
 	
 	// set Z flag
 	if (sum == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (sum <= A_ && sum <= n)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = sum;
 
@@ -2867,13 +2913,13 @@ void CPU::SUB_n(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if (n > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -2952,13 +2998,13 @@ void CPU::SBC_A_n(){
 	if (ans == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	// set C flag
 	if ((n+carry) > A_)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	A_ = ans;
 
@@ -3019,9 +3065,9 @@ void CPU::AND_n(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x50);
+	F_ &= ~(0x50);
 
 	cycles_done_ = 8;
 }
@@ -3042,12 +3088,12 @@ void CPU::ADD_SP_n(){
 
 	SP_ += m;
 
-	F_ &= !(0xC0); // reset Z and N flags
+	F_ &= ~(0xC0); // reset Z and N flags
 
 	// C flag
 	// should be a check here, but come on, its the stack pointer its not going
 	// to carry.
-	F_ &= !(0x10);
+	F_ &= ~(0x10);
 }
 
 void CPU::JP_pHL(){
@@ -3077,9 +3123,9 @@ void CPU::XOR_n(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset all flags
+	F_ &= ~(0x70); // reset all flags
 
 	cycles_done_ = 8;
 }
@@ -3142,9 +3188,9 @@ void CPU::OR_n(){
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset flags
+	F_ &= ~(0x70); // reset flags
 
 	cycles_done_ = 8;
 }
@@ -3165,7 +3211,7 @@ void CPU::LDHL_SP_n(){
 	H_ = (w >> 8) & 0xFF;
 	L_ = w & 0xFF;
 
-	F_ &= !(0xC0);
+	F_ &= ~(0xC0);
 
 	cycles_done_ = 12;
 }
@@ -3199,12 +3245,12 @@ void CPU::CP_n(){
 	if (A_ == n) {
 		F_ |= 0x80;
 		F_ |= 0x40;
-		F_ &= !(0x30);
+		F_ &= ~(0x30);
 	} else if (A_ < n) {
 		F_ |= 0x10;
-		F_ &= !(0xE0);
+		F_ &= ~(0xE0);
 	} else {
-		F_ &= !(0xF0);
+		F_ &= ~(0xF0);
 	}
 
 	cycles_done_ = 8;
@@ -3229,19 +3275,19 @@ void CPU::RLC_B(){
 	if (old_carry)
 		B_ |= 0x01;
 	else
-		B_ &= !(0x01);
+		B_ &= ~(0x01);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (B_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3254,19 +3300,19 @@ void CPU::RLC_C(){
 	if (old_carry)
 		C_ |= 0x01;
 	else
-		C_ &= !(0x01);
+		C_ &= ~(0x01);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (C_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3279,19 +3325,19 @@ void CPU::RLC_D(){
 	if (old_carry)
 		D_ |= 0x01;
 	else
-		D_ &= !(0x01);
+		D_ &= ~(0x01);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (D_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3304,19 +3350,19 @@ void CPU::RLC_E(){
 	if (old_carry)
 		E_ |= 0x01;
 	else
-		E_ &= !(0x01);
+		E_ &= ~(0x01);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (E_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3329,19 +3375,19 @@ void CPU::RLC_H(){
 	if (old_carry)
 		H_ |= 0x01;
 	else
-		H_ &= !(0x01);
+		H_ &= ~(0x01);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (H_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3354,19 +3400,19 @@ void CPU::RLC_L(){
 	if (old_carry)
 		L_ |= 0x01;
 	else
-		L_ &= !(0x01);
+		L_ &= ~(0x01);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (L_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3381,19 +3427,19 @@ void CPU::RLC_pHL(){
 	if (old_carry)
 		n |= 0x01;
 	else
-		n &= !(0x01);
+		n &= ~(0x01);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (n == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	mmu_->writeByte(address, n);
 
@@ -3408,19 +3454,19 @@ void CPU::RLC_A(){
 	if (old_carry)
 		A_ |= 0x01;
 	else
-		A_ &= !(0x01);
+		A_ &= ~(0x01);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3433,19 +3479,19 @@ void CPU::RRC_B(){
 	if (old_carry)
 		B_ |= 0x80;
 	else
-		B_ &= !(0x80);
+		B_ &= ~(0x80);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (B_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3458,19 +3504,19 @@ void CPU::RRC_C(){
 	if (old_carry)
 		C_ |= 0x80;
 	else
-		C_ &= !(0x80);
+		C_ &= ~(0x80);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (C_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3483,19 +3529,19 @@ void CPU::RRC_D(){
 	if (old_carry)
 		D_ |= 0x80;
 	else
-		D_ &= !(0x80);
+		D_ &= ~(0x80);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (D_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3508,19 +3554,19 @@ void CPU::RRC_E(){
 	if (old_carry)
 		E_ |= 0x80;
 	else
-		E_ &= !(0x80);
+		E_ &= ~(0x80);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (E_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3533,19 +3579,19 @@ void CPU::RRC_H(){
 	if (old_carry)
 		H_ |= 0x80;
 	else
-		H_ &= !(0x80);
+		H_ &= ~(0x80);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (H_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3558,19 +3604,19 @@ void CPU::RRC_L(){
 	if (old_carry)
 		L_ |= 0x80;
 	else
-		L_ &= !(0x80);
+		L_ &= ~(0x80);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (L_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3585,19 +3631,19 @@ void CPU::RRC_pHL(){
 	if (old_carry)
 		n |= 0x80;
 	else
-		n &= !(0x80);
+		n &= ~(0x80);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (n == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	mmu_->writeByte(address, n);
 
@@ -3612,19 +3658,19 @@ void CPU::RRC_A(){
 	if (old_carry)
 		A_ |= 0x80;
 	else
-		A_ &= !(0x80);
+		A_ &= ~(0x80);
 
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3637,14 +3683,14 @@ void CPU::RL_B(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (B_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3656,14 +3702,14 @@ void CPU::RL_C(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (C_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3675,14 +3721,14 @@ void CPU::RL_D(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (D_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3694,14 +3740,14 @@ void CPU::RL_E(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (E_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3713,14 +3759,14 @@ void CPU::RL_H(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (H_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3732,14 +3778,14 @@ void CPU::RL_L(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (L_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3753,14 +3799,14 @@ void CPU::RL_pHL(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (n == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	mmu_->writeByte(address, n);
 
@@ -3774,14 +3820,14 @@ void CPU::RL_A(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3793,14 +3839,14 @@ void CPU::RR_B(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (B_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3812,14 +3858,14 @@ void CPU::RR_C(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (C_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3831,14 +3877,14 @@ void CPU::RR_D(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (D_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3850,14 +3896,14 @@ void CPU::RR_E(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (E_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3869,14 +3915,14 @@ void CPU::RR_H(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (H_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3888,14 +3934,14 @@ void CPU::RR_L(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (L_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3909,14 +3955,14 @@ void CPU::RR_pHL(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (n == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	mmu_->writeByte(address, n);
 
@@ -3930,14 +3976,14 @@ void CPU::RR_A(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -3950,14 +3996,14 @@ void CPU::SLA_B(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (B_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -3969,14 +4015,14 @@ void CPU::SLA_C(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (C_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -3988,14 +4034,14 @@ void CPU::SLA_D(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (D_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4007,14 +4053,14 @@ void CPU::SLA_E(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (E_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4026,14 +4072,14 @@ void CPU::SLA_H(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (H_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4045,14 +4091,14 @@ void CPU::SLA_L(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (L_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4066,14 +4112,14 @@ void CPU::SLA_pHL(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (n == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	mmu_->writeByte(address, n);
 
@@ -4087,14 +4133,14 @@ void CPU::SLA_A(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4106,14 +4152,14 @@ void CPU::SRA_B(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (B_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4125,14 +4171,14 @@ void CPU::SRA_C(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (C_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4144,14 +4190,14 @@ void CPU::SRA_D(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (D_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4163,14 +4209,14 @@ void CPU::SRA_E(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (E_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4182,14 +4228,14 @@ void CPU::SRA_H(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (H_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4201,14 +4247,14 @@ void CPU::SRA_L(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (L_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4222,14 +4268,14 @@ void CPU::SRA_pHL(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (n == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	mmu_->writeByte(address, n);
 
@@ -4243,14 +4289,14 @@ void CPU::SRA_A(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4263,9 +4309,9 @@ void CPU::SWAP_B(){
 	if (B_ == 0x00)
 		F_ = 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset N H C
+	F_ &= ~(0x70); // reset N H C
 
 	cycles_done_ = 8;
 }
@@ -4277,9 +4323,9 @@ void CPU::SWAP_C(){
 	if (C_ == 0x00)
 		F_ = 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset N H C
+	F_ &= ~(0x70); // reset N H C
 
 	cycles_done_ = 8;
 }
@@ -4291,9 +4337,9 @@ void CPU::SWAP_D(){
 	if (D_ == 0x00)
 		F_ = 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset N H C
+	F_ &= ~(0x70); // reset N H C
 
 	cycles_done_ = 8;
 }
@@ -4305,9 +4351,9 @@ void CPU::SWAP_E(){
 	if (E_ == 0x00)
 		F_ = 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset N H C
+	F_ &= ~(0x70); // reset N H C
 
 	cycles_done_ = 8;
 }
@@ -4319,9 +4365,9 @@ void CPU::SWAP_H(){
 	if (H_ == 0x00)
 		F_ = 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset N H C
+	F_ &= ~(0x70); // reset N H C
 
 	cycles_done_ = 8;
 }
@@ -4333,9 +4379,9 @@ void CPU::SWAP_L(){
 	if (L_ == 0x00)
 		F_ = 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset N H C
+	F_ &= ~(0x70); // reset N H C
 
 	cycles_done_ = 8;
 }
@@ -4349,9 +4395,9 @@ void CPU::SWAP_pHL(){
 	if (n == 0x00)
 		F_ = 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset N H C
+	F_ &= ~(0x70); // reset N H C
 
 	mmu_->writeByte(address, n);
 
@@ -4365,9 +4411,9 @@ void CPU::SWAP_A(){
 	if (A_ == 0x00)
 		F_ = 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
-	F_ &= !(0x70); // reset N H C
+	F_ &= ~(0x70); // reset N H C
 
 	cycles_done_ = 8;
 }
@@ -4379,14 +4425,14 @@ void CPU::SRL_B(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (B_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4398,14 +4444,14 @@ void CPU::SRL_C(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (C_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4417,14 +4463,14 @@ void CPU::SRL_D(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (D_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4436,14 +4482,14 @@ void CPU::SRL_E(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (E_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4455,14 +4501,14 @@ void CPU::SRL_H(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (H_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4474,14 +4520,14 @@ void CPU::SRL_L(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (L_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4495,14 +4541,14 @@ void CPU::SRL_pHL(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (n == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	mmu_->writeByte(address, n);
 
@@ -4516,14 +4562,14 @@ void CPU::SRL_A(){
 	if (new_carry)
 		F_ |= 0x10;
 	else
-		F_ &= !(0x10);
+		F_ &= ~(0x10);
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	if (A_ == 0x00)
 		F_ |= 0x80;
 	else
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -4533,11 +4579,11 @@ void CPU::BIT_0_B(){
 	BYTE n = B_ & 0x01;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4546,11 +4592,11 @@ void CPU::BIT_0_C(){
 	BYTE n = C_ & 0x01;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4559,11 +4605,11 @@ void CPU::BIT_0_D(){
 	BYTE n = D_ & 0x01;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4572,11 +4618,11 @@ void CPU::BIT_0_E(){
 	BYTE n = E_ & 0x01;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4585,11 +4631,11 @@ void CPU::BIT_0_H(){
 	BYTE n = H_ & 0x01;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4598,11 +4644,11 @@ void CPU::BIT_0_L(){
 	BYTE n = L_ & 0x01;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4613,11 +4659,11 @@ void CPU::BIT_0_pHL(){
 	n = n & 0x01;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 16;
 }
@@ -4626,11 +4672,11 @@ void CPU::BIT_0_A(){
 	BYTE n = A_ & 0x01;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4639,11 +4685,11 @@ void CPU::BIT_1_B(){
 	BYTE n = B_ & 0x02;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4652,11 +4698,11 @@ void CPU::BIT_1_C(){
 	BYTE n = C_ & 0x02;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4665,11 +4711,11 @@ void CPU::BIT_1_D(){
 	BYTE n = D_ & 0x02;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4678,11 +4724,11 @@ void CPU::BIT_1_E(){
 	BYTE n = E_ & 0x02;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4691,11 +4737,11 @@ void CPU::BIT_1_H(){
 	BYTE n = H_ & 0x02;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4704,11 +4750,11 @@ void CPU::BIT_1_L(){
 	BYTE n = L_ & 0x02;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4719,11 +4765,11 @@ void CPU::BIT_1_pHL(){
 	n = n & 0x02;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 16;
 }
@@ -4732,11 +4778,11 @@ void CPU::BIT_1_A(){
 	BYTE n = A_ & 0x02;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4746,11 +4792,11 @@ void CPU::BIT_2_B(){
 	BYTE n = B_ & 0x04;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4759,11 +4805,11 @@ void CPU::BIT_2_C(){
 	BYTE n = C_ & 0x04;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4772,11 +4818,11 @@ void CPU::BIT_2_D(){
 	BYTE n = D_ & 0x04;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4785,11 +4831,11 @@ void CPU::BIT_2_E(){
 	BYTE n = E_ & 0x04;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4798,11 +4844,11 @@ void CPU::BIT_2_H(){
 	BYTE n = H_ & 0x04;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4811,11 +4857,11 @@ void CPU::BIT_2_L(){
 	BYTE n = L_ & 0x04;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4826,11 +4872,11 @@ void CPU::BIT_2_pHL(){
 	n = n & 0x04;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 16;
 }
@@ -4839,11 +4885,11 @@ void CPU::BIT_2_A(){
 	BYTE n = A_ & 0x04;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4852,11 +4898,11 @@ void CPU::BIT_3_B(){
 	BYTE n = B_ & 0x08;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4865,11 +4911,11 @@ void CPU::BIT_3_C(){
 	BYTE n = C_ & 0x08;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4878,11 +4924,11 @@ void CPU::BIT_3_D(){
 	BYTE n = D_ & 0x08;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4891,11 +4937,11 @@ void CPU::BIT_3_E(){
 	BYTE n = E_ & 0x08;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4904,11 +4950,11 @@ void CPU::BIT_3_H(){
 	BYTE n = H_ & 0x08;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4917,11 +4963,11 @@ void CPU::BIT_3_L(){
 	BYTE n = L_ & 0x08;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4932,11 +4978,11 @@ void CPU::BIT_3_pHL(){
 	n = n & 0x08;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 16;
 }
@@ -4945,11 +4991,11 @@ void CPU::BIT_3_A(){
 	BYTE n = A_ & 0x08;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4959,11 +5005,11 @@ void CPU::BIT_4_B(){
 	BYTE n = B_ & 0x10;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4972,11 +5018,11 @@ void CPU::BIT_4_C(){
 	BYTE n = C_ & 0x10;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4985,11 +5031,11 @@ void CPU::BIT_4_D(){
 	BYTE n = D_ & 0x10;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -4998,11 +5044,11 @@ void CPU::BIT_4_E(){
 	BYTE n = E_ & 0x10;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5011,11 +5057,11 @@ void CPU::BIT_4_H(){
 	BYTE n = H_ & 0x10;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5024,11 +5070,11 @@ void CPU::BIT_4_L(){
 	BYTE n = L_ & 0x10;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5039,11 +5085,11 @@ void CPU::BIT_4_pHL(){
 	n = n & 0x10;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 16;
 }
@@ -5052,11 +5098,11 @@ void CPU::BIT_4_A(){
 	BYTE n = A_ & 0x10;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5065,11 +5111,11 @@ void CPU::BIT_5_B(){
 	BYTE n = B_ & 0x20;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5078,11 +5124,11 @@ void CPU::BIT_5_C(){
 	BYTE n = C_ & 0x20;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5091,11 +5137,11 @@ void CPU::BIT_5_D(){
 	BYTE n = D_ & 0x20;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5104,11 +5150,11 @@ void CPU::BIT_5_E(){
 	BYTE n = E_ & 0x20;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5117,11 +5163,11 @@ void CPU::BIT_5_H(){
 	BYTE n = H_ & 0x20;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5130,11 +5176,11 @@ void CPU::BIT_5_L(){
 	BYTE n = L_ & 0x20;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5145,11 +5191,11 @@ void CPU::BIT_5_pHL(){
 	n = n & 0x20;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 16;
 }
@@ -5158,11 +5204,11 @@ void CPU::BIT_5_A(){
 	BYTE n = A_ & 0x20;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5172,11 +5218,11 @@ void CPU::BIT_6_B(){
 	BYTE n = B_ & 0x40;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5185,11 +5231,11 @@ void CPU::BIT_6_C(){
 	BYTE n = C_ & 0x40;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5198,11 +5244,11 @@ void CPU::BIT_6_D(){
 	BYTE n = D_ & 0x40;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5211,11 +5257,11 @@ void CPU::BIT_6_E(){
 	BYTE n = E_ & 0x40;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5224,11 +5270,11 @@ void CPU::BIT_6_H(){
 	BYTE n = H_ & 0x40;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5237,11 +5283,11 @@ void CPU::BIT_6_L(){
 	BYTE n = L_ & 0x40;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5252,11 +5298,11 @@ void CPU::BIT_6_pHL(){
 	n = n & 0x40;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 16;
 }
@@ -5265,11 +5311,11 @@ void CPU::BIT_6_A(){
 	BYTE n = A_ & 0x40;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5278,11 +5324,11 @@ void CPU::BIT_7_B(){
 	BYTE n = B_ & 0x80;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5291,11 +5337,11 @@ void CPU::BIT_7_C(){
 	BYTE n = C_ & 0x80;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5304,11 +5350,11 @@ void CPU::BIT_7_D(){
 	BYTE n = D_ & 0x80;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5317,11 +5363,11 @@ void CPU::BIT_7_E(){
 	BYTE n = E_ & 0x80;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5330,11 +5376,11 @@ void CPU::BIT_7_H(){
 	BYTE n = H_ & 0x80;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5343,11 +5389,11 @@ void CPU::BIT_7_L(){
 	BYTE n = L_ & 0x80;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
@@ -5358,11 +5404,11 @@ void CPU::BIT_7_pHL(){
 	n = n & 0x80;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 16;
 }
@@ -5371,48 +5417,48 @@ void CPU::BIT_7_A(){
 	BYTE n = A_ & 0x80;
 
 	if (n)
-		F_ &= !(0x80);
+		F_ &= ~(0x80);
 	else
 		F_ |= 0x80;
 
-	F_ &= !(0x60);
+	F_ &= ~(0x60);
 
 	cycles_done_ = 8;
 }
 
 // 80
 void CPU::RES_0_B(){
-	B_ &= !(0x01);
+	B_ &= ~(0x01);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_0_C(){
-	C_ &= !(0x01);
+	C_ &= ~(0x01);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_0_D(){
-	D_ &= !(0x01);
+	D_ &= ~(0x01);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_0_E(){
-	E_ &= !(0x01);
+	E_ &= ~(0x01);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_0_H(){
-	H_ &= !(0x01);
+	H_ &= ~(0x01);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_0_L(){
-	L_ &= !(0x01);
+	L_ &= ~(0x01);
 
 	cycles_done_ = 8;
 }
@@ -5421,7 +5467,7 @@ void CPU::RES_0_pHL(){
 	WORD address = (H_ << 8) | L_;
 	BYTE n; mmu_->readByte(address, n);
 
-	n &= !(0x01);
+	n &= ~(0x01);
 
 	mmu_->writeByte(address, n);
 
@@ -5429,43 +5475,43 @@ void CPU::RES_0_pHL(){
 }
 
 void CPU::RES_0_A(){
-	A_ &= !(0x01);
+	A_ &= ~(0x01);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_1_B(){
-	B_ &= !(0x02);
+	B_ &= ~(0x02);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_1_C(){
-	C_ &= !(0x02);
+	C_ &= ~(0x02);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_1_D(){
-	D_ &= !(0x02);
+	D_ &= ~(0x02);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_1_E(){
-	E_ &= !(0x02);
+	E_ &= ~(0x02);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_1_H(){
-	H_ &= !(0x02);
+	H_ &= ~(0x02);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_1_L(){
-	L_ &= !(0x02);
+	L_ &= ~(0x02);
 
 	cycles_done_ = 8;
 }
@@ -5474,7 +5520,7 @@ void CPU::RES_1_pHL(){
 	WORD address = (H_ << 8) | L_;
 	BYTE n; mmu_->readByte(address, n);
 
-	n &= !(0x02);
+	n &= ~(0x02);
 
 	mmu_->writeByte(address, n);
 
@@ -5482,44 +5528,44 @@ void CPU::RES_1_pHL(){
 }
 
 void CPU::RES_1_A(){
-	A_ &= !(0x02);
+	A_ &= ~(0x02);
 
 	cycles_done_ = 8;
 }
 
 // 90
 void CPU::RES_2_B(){
-	B_ &= !(0x04);
+	B_ &= ~(0x04);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_2_C(){
-	C_ &= !(0x04);
+	C_ &= ~(0x04);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_2_D(){
-	D_ &= !(0x04);
+	D_ &= ~(0x04);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_2_E(){
-	E_ &= !(0x04);
+	E_ &= ~(0x04);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_2_H(){
-	H_ &= !(0x04);
+	H_ &= ~(0x04);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_2_L(){
-	L_ &= !(0x04);
+	L_ &= ~(0x04);
 
 	cycles_done_ = 8;
 }
@@ -5528,7 +5574,7 @@ void CPU::RES_2_pHL(){
 	WORD address = (H_ << 8) | L_;
 	BYTE n; mmu_->readByte(address, n);
 
-	n &= !(0x04);
+	n &= ~(0x04);
 
 	mmu_->writeByte(address, n);
 
@@ -5536,43 +5582,43 @@ void CPU::RES_2_pHL(){
 }
 
 void CPU::RES_2_A(){
-	A_ &= !(0x04);
+	A_ &= ~(0x04);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_3_B(){
-	B_ &= !(0x08);
+	B_ &= ~(0x08);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_3_C(){
-	C_ &= !(0x08);
+	C_ &= ~(0x08);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_3_D(){
-	D_ &= !(0x08);
+	D_ &= ~(0x08);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_3_E(){
-	E_ &= !(0x08);
+	E_ &= ~(0x08);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_3_H(){
-	H_ &= !(0x08);
+	H_ &= ~(0x08);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_3_L(){
-	L_ &= !(0x08);
+	L_ &= ~(0x08);
 
 	cycles_done_ = 8;
 }
@@ -5581,7 +5627,7 @@ void CPU::RES_3_pHL(){
 	WORD address = (H_ << 8) | L_;
 	BYTE n; mmu_->readByte(address, n);
 
-	n &= !(0x08);
+	n &= ~(0x08);
 
 	mmu_->writeByte(address, n);
 
@@ -5589,44 +5635,44 @@ void CPU::RES_3_pHL(){
 }
 
 void CPU::RES_3_A(){
-	A_ &= !(0x08);
+	A_ &= ~(0x08);
 
 	cycles_done_ = 8;
 }
 
 // A0
 void CPU::RES_4_B(){
-	B_ &= !(0x10);
+	B_ &= ~(0x10);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_4_C(){
-	C_ &= !(0x10);
+	C_ &= ~(0x10);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_4_D(){
-	D_ &= !(0x10);
+	D_ &= ~(0x10);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_4_E(){
-	E_ &= !(0x10);
+	E_ &= ~(0x10);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_4_H(){
-	H_ &= !(0x10);
+	H_ &= ~(0x10);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_4_L(){
-	L_ &= !(0x10);
+	L_ &= ~(0x10);
 
 	cycles_done_ = 8;
 }
@@ -5635,7 +5681,7 @@ void CPU::RES_4_pHL(){
 	WORD address = (H_ << 8) | L_;
 	BYTE n; mmu_->readByte(address, n);
 
-	n &= !(0x10);
+	n &= ~(0x10);
 
 	mmu_->writeByte(address, n);
 
@@ -5643,43 +5689,43 @@ void CPU::RES_4_pHL(){
 }
 
 void CPU::RES_4_A(){
-	A_ &= !(0x10);
+	A_ &= ~(0x10);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_5_B(){
-	B_ &= !(0x20);
+	B_ &= ~(0x20);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_5_C(){
-	C_ &= !(0x20);
+	C_ &= ~(0x20);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_5_D(){
-	D_ &= !(0x20);
+	D_ &= ~(0x20);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_5_E(){
-	E_ &= !(0x20);
+	E_ &= ~(0x20);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_5_H(){
-	H_ &= !(0x20);
+	H_ &= ~(0x20);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_5_L(){
-	L_ &= !(0x20);
+	L_ &= ~(0x20);
 
 	cycles_done_ = 8;
 }
@@ -5688,7 +5734,7 @@ void CPU::RES_5_pHL(){
 	WORD address = (H_ << 8) | L_;
 	BYTE n; mmu_->readByte(address, n);
 
-	n &= !(0x20);
+	n &= ~(0x20);
 
 	mmu_->writeByte(address, n);
 
@@ -5696,44 +5742,44 @@ void CPU::RES_5_pHL(){
 }
 
 void CPU::RES_5_A(){
-	A_ &= !(0x20);
+	A_ &= ~(0x20);
 
 	cycles_done_ = 8;
 }
 
 // B0
 void CPU::RES_6_B(){
-	B_ &= !(0x40);
+	B_ &= ~(0x40);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_6_C(){
-	C_ &= !(0x40);
+	C_ &= ~(0x40);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_6_D(){
-	D_ &= !(0x40);
+	D_ &= ~(0x40);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_6_E(){
-	E_ &= !(0x40);
+	E_ &= ~(0x40);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_6_H(){
-	H_ &= !(0x40);
+	H_ &= ~(0x40);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_6_L(){
-	L_ &= !(0x40);
+	L_ &= ~(0x40);
 
 	cycles_done_ = 8;
 }
@@ -5742,7 +5788,7 @@ void CPU::RES_6_pHL(){
 	WORD address = (H_ << 8) | L_;
 	BYTE n; mmu_->readByte(address, n);
 
-	n &= !(0x40);
+	n &= ~(0x40);
 
 	mmu_->writeByte(address, n);
 
@@ -5750,43 +5796,43 @@ void CPU::RES_6_pHL(){
 }
 
 void CPU::RES_6_A(){
-	A_ &= !(0x40);
+	A_ &= ~(0x40);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_7_B(){
-	B_ &= !(0x80);
+	B_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_7_C(){
-	C_ &= !(0x80);
+	C_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_7_D(){
-	D_ &= !(0x80);
+	D_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_7_E(){
-	E_ &= !(0x80);
+	E_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_7_H(){
-	H_ &= !(0x80);
+	H_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
 
 void CPU::RES_7_L(){
-	L_ &= !(0x80);
+	L_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }
@@ -5795,7 +5841,7 @@ void CPU::RES_7_pHL(){
 	WORD address = (H_ << 8) | L_;
 	BYTE n; mmu_->readByte(address, n);
 
-	n &= !(0x80);
+	n &= ~(0x80);
 
 	mmu_->writeByte(address, n);
 
@@ -5803,7 +5849,7 @@ void CPU::RES_7_pHL(){
 }
 
 void CPU::RES_7_A(){
-	A_ &= !(0x80);
+	A_ &= ~(0x80);
 
 	cycles_done_ = 8;
 }

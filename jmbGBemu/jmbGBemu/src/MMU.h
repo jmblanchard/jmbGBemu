@@ -28,6 +28,8 @@ public:
 	void updateTima();
 	void updateLY();
 	void setLCDCMode(Mode m);
+	void setButtonPressed(Button b);
+	void setButtonReleased(Button b);
 
 	void test(); // will be responsible for testing
 

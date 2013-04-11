@@ -31,4 +31,15 @@ enum Mode {
 	MODE_3
 };
 
+enum Button {
+	BUTTON_UP = 0,
+	BUTTON_DOWN,
+	BUTTON_LEFT,
+	BUTTON_RIGHT,
+	BUTTON_A,
+	BUTTON_B,
+	BUTTON_START,
+	BUTTON_SELECT
+};
+
 #endif

@@ -61,19 +61,19 @@ void MMU::readByte(WORD address, BYTE &dest) {
 	if (address < 0x4000) {
 		dest = rom_bank_0_[address];
 	} else if (address < 0x8000) {
-		dest = switchable_rom_bank_[curr_rom_bank_][address&0x3FFF];
+		dest = switchable_rom_bank_[curr_rom_bank_][address-0x4000];
 	} else if (address < 0xA000) {
-		dest = video_ram_[address&0x1FFF];
+		dest = video_ram_[address-0x8000];
 	} else if (address < 0xC000) {
-		dest = switchable_ram_bank_[curr_ram_bank_][address&0x1FFF];
+		dest = switchable_ram_bank_[curr_ram_bank_][address-0xA000];
 	} else if (address < 0xE000) {
-		dest = internal_ram_[address&0x1FFF];
+		dest = internal_ram_[address-0xC000];
 	} else if (address >= 0xFE00 && address < 0xFEA0) {
-		dest = oam_[address&0x9F];
+		dest = oam_[address-0xFE00];
 	} else if (address >= 0xFF00 && address < 0xFF4C) {
-		dest = io_ports_[address&0x4B];
+		dest = io_ports_[address-0xFF00];
 	} else if (address >= 0xFF80 && address < 0xFFFF) {
-		dest = stack_ram_[address&0x7E];
+		dest = stack_ram_[address-0xFF80];
 	} else if (address == 0xFFFF) {
 		dest = interrupt_enable_register_;
 	}
@@ -109,23 +109,23 @@ void MMU::writeByte(WORD address, BYTE val) {
 		// if STAT register (0xFF41) shows that we are in H-Blank
 		// or V-Blank, we can write to video memory.
 		if ((io_ports_[0x41] & 0x03) != 0x03) {
-			video_ram_[address&0x1FFF] = val;
+			video_ram_[address-0x8000] = val;
 		}
 	} else if (address < 0xC000) {
 		if (ram_enable_) {
-			switchable_ram_bank_[curr_ram_bank_][address&0x1FFF] = val;
+			switchable_ram_bank_[curr_ram_bank_][address-0xA000] = val;
 		}
 	} else if (address < 0xE000) {
-		internal_ram_[address&0x1FFF] = val;
+		internal_ram_[address-0xC000] = val;
 	} else if (address >= 0xFE00 && address < 0xFEA0) {
 		// if STAT register (0xFF41) shows we are in H-Blank or V-Blank
 		// we can write to OAM sprite memory
 		if (!(io_ports_[0x41] & 0x02)) {
-			oam_[address&0x9F] = val;
+			oam_[address-0xFE00] = val;
 		}
 	} else if (address >= 0xFF00 && address < 0xFF4C) {
 		// special cases here based on the address to be written.
-		address = address & 0x4B;
+		address = address - 0xFF00;
 		switch (address) {
 		case 0x00: {// Joypad input register 0xFF00
 			// we check to see which buttons we're looking at
@@ -137,23 +137,39 @@ void MMU::writeByte(WORD address, BYTE val) {
 			// else If we select P15, we check if any button keys are pressed
 			// if any of these buttons are pressed we TOGGLE THE BIT TO 0.
 			if (selectBit == 0x10) {
-				if (right_pressed_)
+				if (right_pressed_) {
 					build ^= 0x01;
-				if (left_pressed_)
+					std::cout << "Right button pressed.\n";
+				}
+				if (left_pressed_) {
 					build ^= 0x02;
-				if (up_pressed_)
+					std::cout << "Left button pressed.\n";
+				}
+				if (up_pressed_) {
 					build ^= 0x04;
-				if (down_pressed_)
+					std::cout << "Up button pressed.\n";
+				}
+				if (down_pressed_) {
 					build ^= 0x08;
+					std::cout << "Down button pressed.\n";
+				}
 			} else if (selectBit == 0x20) {
-				if (a_pressed_)
+				if (a_pressed_) {
 					build ^= 0x01;
-				if (b_pressed_)
+					std::cout << "A button pressed.\n";
+				}
+				if (b_pressed_) {
 					build ^= 0x02;
-				if (start_pressed_)
+					std::cout << "B button pressed.\n";
+				}
+				if (start_pressed_) {
 					build ^= 0x04;
-				if (select_pressed_)
+					std::cout << "Start button pressed.\n";
+				}
+				if (select_pressed_) {
 					build ^= 0x08;
+					std::cout << "Select button pressed.\n";
+				}
 			}
 
 			io_ports_[address] = build;
@@ -200,13 +216,13 @@ void MMU::writeByte(WORD address, BYTE val) {
 				BYTE src = rom_bank_0_[wval&0x4000];
 				if (wval < 0x4000) {
 				} else if (wval < 0x8000) {
-					src = switchable_rom_bank_[curr_rom_bank_][wval&0x4000];
+					src = switchable_rom_bank_[curr_rom_bank_][wval-0x4000];
 				} else if (wval < 0xA000) {
-					src = video_ram_[wval&0x2000];
+					src = video_ram_[wval-0x8000];
 				} else if (wval < 0xC000) {
-					src = switchable_ram_bank_[curr_ram_bank_][wval&0x2000];
+					src = switchable_ram_bank_[curr_ram_bank_][wval-0xA000];
 				} else if (wval < 0xE000) {
-					src = internal_ram_[wval&0x2000];
+					src = internal_ram_[wval-0xC000];
 				}
 
 				memcpy(oam_, &src, 0x9F);
@@ -218,7 +234,7 @@ void MMU::writeByte(WORD address, BYTE val) {
 			break;
 		}
 	} else if (address >= 0xFF80 && address < 0xFFFF) {
-		stack_ram_[address&0x7E] = val;
+		stack_ram_[address-0xFF80] = val;
 	} else if (address == 0xFFFF) {
 		interrupt_enable_register_ = val;
 	}
@@ -228,21 +244,21 @@ void MMU::readWord(WORD address, WORD &dest) {
 	if (address < 0x4000) {
 		dest = (rom_bank_0_[address+1] << 8) | (rom_bank_0_[address]);
 	} else if (address < 0x8000) {
-		dest = (switchable_rom_bank_[curr_rom_bank_][address&0x3FFF+1] << 8) | 
-			(switchable_rom_bank_[curr_rom_bank_][address&0x3FFF]);
+		dest = (switchable_rom_bank_[curr_rom_bank_][address-0x4000+0x01] << 8) | 
+			(switchable_rom_bank_[curr_rom_bank_][address-0x4000]);
 	} else if (address < 0xA000) {
-		dest = (video_ram_[address&0x1FFF+1] << 8) | video_ram_[address&0x1FFF];
+		dest = (video_ram_[address-0x8000+0x01] << 8) | video_ram_[address-0x8000];
 	} else if (address < 0xC000) {
-		dest = (switchable_ram_bank_[curr_ram_bank_][address&0x1FFF+1] << 8) |
-			switchable_ram_bank_[curr_ram_bank_][address&0x1FFF];
+		dest = (switchable_ram_bank_[curr_ram_bank_][address-0xA000+0x01] << 8) |
+			switchable_ram_bank_[curr_ram_bank_][address-0xA000];
 	} else if (address < 0xE000) {
-		dest = (internal_ram_[address&0x1FFF+1] << 8) | internal_ram_[address&0x1FFF];
+		dest = (internal_ram_[address-0xC000+0x01] << 8) | internal_ram_[address-0xC000];
 	} else if (address >= 0xFE00 && address < 0xFEA0) {
-		dest = (oam_[address&0x9F+1] << 8) | oam_[address&0x9F];
+		dest = (oam_[address-0xFE00+0x01] << 8) | oam_[address-0xFE00];
 	} else if (address >= 0xFF00 && address < 0xFF4C) {
-		dest = (io_ports_[address&0x4B+1] << 8) | io_ports_[address&0x4B];
+		dest = (io_ports_[address-0xFF00+0x01] << 8) | io_ports_[address-0xFF00];
 	} else if (address >= 0xFF80 && address < 0xFFFF) {
-		dest = (stack_ram_[address&0x7E+1] << 8) | stack_ram_[address&0x7E];
+		dest = (stack_ram_[address-0xFF80+0x01] << 8) | stack_ram_[address-0xFF80];
 	} else if (address == 0xFFFF) {
 		std::cout << "Can't read WORD from location 0xFFFF\n";
 	}
@@ -256,29 +272,29 @@ void MMU::writeWord(WORD address, WORD val) {
 	} else if (address < 0xA000) {
 		// Can only write to video RAM in modes 0-2
 		if ((io_ports_[0x41] & 0x03) != 0x03) {
-			video_ram_[address&0x1FFF+1] = (val >> 8) & 0x00FF;
-			video_ram_[address&0x1FFF] = (val & 0x00FF);
+			video_ram_[address-0x8000+1] = (val >> 8) & 0x00FF;
+			video_ram_[address-0x8000] = (val & 0x00FF);
 		}
 	} else if (address < 0xC000) {
 		if (ram_enable_) {
-			switchable_ram_bank_[curr_ram_bank_][address&0x1FFF+1] = (val >> 8) & 0x00FF;
-			switchable_ram_bank_[curr_ram_bank_][address&0x1FFF] = (val & 0x00FF);
+			switchable_ram_bank_[curr_ram_bank_][address-0xA000+1] = (val >> 8) & 0x00FF;
+			switchable_ram_bank_[curr_ram_bank_][address-0xA000] = (val & 0x00FF);
 		}
 	} else if (address < 0xE000) {
-		internal_ram_[address&0x1FFF+1] = (val >> 8) & 0x00FF;
-		internal_ram_[address&0x1FFF] = (val & 0x00FF);
+		internal_ram_[address-0xC000+1] = (val >> 8) & 0x00FF;
+		internal_ram_[address-0xC000] = (val & 0x00FF);
 	} else if (address >= 0xFE00 && address < 0xFEA0) {
 		// if STAT register (0xFF41) shows we are in H-Blank or V-Blank
 		// we can write to OAM sprite memory
 		if (!(io_ports_[0x41] & 0x02)) {
-			oam_[address&0x9F+1] = (val >> 8) & 0x00FF;
-			oam_[address&0x9F] = (val & 0x00FF);
+			oam_[address-0xFE00+1] = (val >> 8) & 0x00FF;
+			oam_[address-0xFE00] = (val & 0x00FF);
 		}
 	} else if (address >= 0xFF00 && address < 0xFF4C) {
 		std::cout << "Writing to I/O registers with WORD, consider changing to BYTE since this fails.\n";
 	} else if (address >= 0xFF80 && address < 0xFFFF) {
-		stack_ram_[address&0x7E+1] = (val >> 8) & 0x00FF;
-		stack_ram_[address&0x7E] = (val & 0x00FF);
+		stack_ram_[address-0xFF80+1] = (val >> 8) & 0x00FF;
+		stack_ram_[address-0xFF80] = (val & 0x00FF);
 	} else if (address == 0xFFFF) {
 		std::cout << "Can't write WORD to location 0xFFFF\n";
 	}
@@ -325,7 +341,7 @@ void MMU::updateLY() {
 // Set the LCDC mode to what we pass in.
 void MMU::setLCDCMode(Mode m) {
 	// clear bottom 2 bits
-	io_ports_[0x41] &= !(0x03);
+	io_ports_[0x41] &= ~(0x03);
 
 	if (m == MODE_0) {
 		// check for LCDC interrupt and set if needed
@@ -346,6 +362,71 @@ void MMU::setLCDCMode(Mode m) {
 	} else if (m == MODE_3) {
 		io_ports_[0x41] |= 0x03;
 		// no interrupt here
+	}
+}
+
+void MMU::setButtonPressed(Button b) {
+	switch (b) {
+	case BUTTON_UP:
+		up_pressed_ = true;
+		break;
+	case BUTTON_DOWN:
+		down_pressed_ = true;
+		break;
+	case BUTTON_LEFT:
+		left_pressed_ = true;
+		break;
+	case BUTTON_RIGHT:
+		right_pressed_ = true;
+		break;
+	case BUTTON_A:
+		a_pressed_ = true;
+		break;
+	case BUTTON_B:
+		b_pressed_ = true;
+		break;
+	case BUTTON_START:
+		start_pressed_ = true;
+		break;
+	case BUTTON_SELECT:
+		select_pressed_ = true;
+		break;
+	default:
+		break;
+	}
+
+	// set flag for button press
+	io_ports_[0x0F] |= 0x10;
+}
+
+void MMU::setButtonReleased(Button b) {
+	switch (b) {
+	case BUTTON_UP:
+		up_pressed_ = false;
+		break;
+	case BUTTON_DOWN:
+		down_pressed_ = false;
+		break;
+	case BUTTON_LEFT:
+		left_pressed_ = false;
+		break;
+	case BUTTON_RIGHT:
+		right_pressed_ = false;
+		break;
+	case BUTTON_A:
+		a_pressed_ = false;
+		break;
+	case BUTTON_B:
+		b_pressed_ = false;
+		break;
+	case BUTTON_START:
+		start_pressed_ = false;
+		break;
+	case BUTTON_SELECT:
+		select_pressed_ = false;
+		break;
+	default:
+		break;
 	}
 }
 
@@ -389,4 +470,256 @@ void MMU::loadROM(std::string filename) {
 	} else {
 		std::cout << "Failed to open ROM file.\n";
 	}
+}
+
+void MMU::test() {
+	BYTE b;
+	WORD w;
+
+	// BYTE READING AND WRITING TESTS
+	// ------------------------------
+
+	// reading and writing ROM banks
+	std::cout << "\nReading/Writing ROM banks.\n";
+	rom_bank_0_[0x0000] = 0xFF;
+	readByte(0x0000, b);
+	if (b == 0xFF)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	rom_bank_0_[0x3FFF] = 0x1F;
+	readByte(0x3FFF, b);
+	if (b == 0x1F)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	switchable_rom_bank_[0][0x0000] = 0xFF;
+	readByte(0x4000, b);
+	if (b == 0xFF)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	switchable_rom_bank_[0][0x3FFF] = 0xFF;
+	readByte(0x7FFF, b);
+	if (b == 0xFF)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	// reading and writing video RAM
+	std::cout << "\nReading/Writing video RAM\n";
+	io_ports_[0x41] = 0x01; // so we can actually write to RAM
+
+	writeByte(0x8000, 0x11);
+	readByte(0x8000, b);
+	if (b == 0x11)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeByte(0x9000, 0x1F);
+	readByte(0x9000, b);
+	if (b == 0x1F)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeByte(0x9FFF, 0xF1);
+	readByte(0x9FFF, b);
+	if (b == 0xF1)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	// reading and writing switchable RAM bank
+	std::cout << "\nReading/Writing switchable RAM bank.\n";
+	writeByte(0x1000, 0x0A);
+	if (ram_enable_)
+		std::cout << "RAM enable passed.\n";
+	else
+		std::cout << "RAM enable failed.\n";
+
+	writeByte(0xA000, 0xAB);
+	readByte(0xA000, b);
+	if (b == 0xAB)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeByte(0xB000, 0xBB);
+	readByte(0xB000, b);
+	if (b == 0xBB)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeByte(0xBFFF, 0xCB);
+	readByte(0xBFFF, b);
+	if (b == 0xCB)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	// reading and writing internal RAM
+	std::cout << "\nReading/Writing internal RAM.\n";
+	writeByte(0xC000, 0xAC);
+	readByte(0xC000, b);
+	if (b == 0xAC)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeByte(0xD000, 0xBC);
+	readByte(0xD000, b);
+	if (b == 0xBC)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeByte(0xDFFF, 0xDC);
+	readByte(0xDFFF, b);
+	if (b == 0xDC)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	// reading and writing OAM
+	std::cout << "\nReading/Writing OAM.\n";
+	io_ports_[0x41] = 0x00; // set so we can write to OAM
+
+	writeByte(0xFE00, 0xCC);
+	readByte(0xFE00, b);
+	if (b == 0xCC)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeByte(0xFE50, 0xDC);
+	readByte(0xFE50, b);
+	if (b == 0xDC)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeByte(0xFE9F, 0x1C);
+	readByte(0xFE9F, b);
+	if (b == 0x1C)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	// reading and writing I/O ports
+
+	// reading and writing stack RAM
+	std::cout << "\nReading/Writing stack RAM.\n";
+	writeByte(0xFF80, 0x89);
+	readByte(0xFF80, b);
+	if (b == 0x89)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeByte(0xFF8F, 0x99);
+	readByte(0xFF8F, b);
+	if (b == 0x99)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeByte(0xFFEF, 0x19);
+	readByte(0xFFEF, b);
+	if (b == 0x19)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	// reading and writing IE Register
+	std::cout << "\nReading/Writing IE Register.\n";
+	writeByte(0xFFFF, 0x11);
+	readByte(0xFFFF, b);
+	if (b == 0x11)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	// WORD READING AND WRITING TESTS
+	// -------------------------------
+
+	// read and write from ROM bank 0
+	std::cout << "\nRead/Write ROM bank 0.\n";
+	rom_bank_0_[0x0000] = 0x12;
+	rom_bank_0_[0x0001] = 0x34;
+	readWord(0x0000, w);
+	if (w == 0x3412)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	rom_bank_0_[0x2000] = 0x22;
+	rom_bank_0_[0x2001] = 0x44;
+	readWord(0x2000, w);
+	if (w == 0x4422)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	rom_bank_0_[0x3FFE] = 0x56;
+	rom_bank_0_[0x3FFF] = 0x78;
+	readWord(0x3FFE, w);
+	if (w == 0x7856)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	// read and write from switchable ROM bank.
+	std::cout << "\nRead/Write from switchable ROM bank.\n";
+	switchable_rom_bank_[0][0x0000] = 0xAB;
+	switchable_rom_bank_[0][0x0001] = 0xBC;
+	readWord(0x4000, w);
+	if (w == 0xBCAB)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	switchable_rom_bank_[0][0x1000] = 0xBB;
+	switchable_rom_bank_[0][0x1001] = 0xBC;
+	readWord(0x5000, w);
+	if (w == 0xBCBB)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	switchable_rom_bank_[0][0x3FFE] = 0xAB;
+	switchable_rom_bank_[0][0x3FFF] = 0xBD;
+	readWord(0x7FFE, w);
+	if (w == 0xBDAB)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	// read and write video RAM.
+	std::cout << "\nRead/Write from video RAM.\n";
+	writeWord(0x8000, 0xAABB);
+	readWord(0x8000, w);
+	if (w == 0xAABB)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeWord(0x9000, 0xCABB);
+	readWord(0x9000, w);
+	if (w == 0xCABB)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
+
+	writeWord(0xBFFE, 0xACBB);
+	readWord(0xBFFE, w);
+	if (w == 0xACBB)
+		std::cout << "TEST passed.\n";
+	else
+		std::cout << "TEST failed.\n";
 }

@@ -29,6 +29,8 @@ private:
 	BYTE A_, B_, C_, D_, E_, F_, H_, L_;
 	WORD SP_, PC_;
 
+	BYTE curr_op;
+
 	// Number of cycles done by last instruction
 	int cycles_done_;
 
