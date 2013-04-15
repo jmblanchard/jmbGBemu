@@ -119,9 +119,10 @@ void MMU::writeByte(WORD address, BYTE val) {
 	} else if (address < 0xA000) {
 		// if STAT register (0xFF41) shows that we are in H-Blank
 		// or V-Blank, we can write to video memory.
-		if ((io_ports_[0x41] & 0x03) != 0x03) {
+		//if ((io_ports_[0x41] & 0x03) != 0x03) {
 			video_ram_[address-0x8000] = val;
-		}
+			recalc_bg_data_ = true;
+		//}
 	} else if (address < 0xC000) {
 		if (ram_enable_) {
 			switchable_ram_bank_[curr_ram_bank_][address-0xA000] = val;
@@ -131,10 +132,10 @@ void MMU::writeByte(WORD address, BYTE val) {
 	} else if (address >= 0xFE00 && address < 0xFEA0) {
 		// if STAT register (0xFF41) shows we are in H-Blank or V-Blank
 		// we can write to OAM sprite memory
-		if (!(io_ports_[0x41] & 0x02)) {
+		//if (!(io_ports_[0x41] & 0x02)) {
 			oam_[address-0xFE00] = val;
 			recalc_bg_data_ = true;
-		}
+		//}
 	} else if (address >= 0xFF00 && address < 0xFF4C) {
 		// special cases here based on the address to be written.
 		address = address - 0xFF00;
@@ -151,36 +152,36 @@ void MMU::writeByte(WORD address, BYTE val) {
 			if (selectBit == 0x20) {
 				if (right_pressed_) {
 					build ^= 0x01;
-					std::cout << "Right button pressed.\n";
+					//std::cout << "Right button pressed.\n";
 				}
 				if (left_pressed_) {
 					build ^= 0x02;
-					std::cout << "Left button pressed.\n";
+					//std::cout << "Left button pressed.\n";
 				}
 				if (up_pressed_) {
 					build ^= 0x04;
-					std::cout << "Up button pressed.\n";
+					//std::cout << "Up button pressed.\n";
 				}
 				if (down_pressed_) {
 					build ^= 0x08;
-					std::cout << "Down button pressed.\n";
+					//std::cout << "Down button pressed.\n";
 				}
 			} else if (selectBit == 0x10) {
 				if (a_pressed_) {
 					build ^= 0x01;
-					std::cout << "A button pressed.\n";
+					//std::cout << "A button pressed.\n";
 				}
 				if (b_pressed_) {
 					build ^= 0x02;
-					std::cout << "B button pressed.\n";
+					//std::cout << "B button pressed.\n";
 				}
 				if (start_pressed_) {
 					build ^= 0x04;
-					std::cout << "Start button pressed.\n";
+					//std::cout << "Start button pressed.\n";
 				}
 				if (select_pressed_) {
 					build ^= 0x08;
-					std::cout << "Select button pressed.\n";
+					//std::cout << "Select button pressed.\n";
 				}
 			}
 
@@ -309,10 +310,10 @@ void MMU::writeWord(WORD address, WORD val) {
 	} else if (address < 0x8000) {
 	} else if (address < 0xA000) {
 		// Can only write to video RAM in modes 0-2
-		if ((io_ports_[0x41] & 0x03) != 0x03) {
+		//if ((io_ports_[0x41] & 0x03) != 0x03) {
 			video_ram_[address-0x8000+1] = (val >> 8) & 0x00FF;
 			video_ram_[address-0x8000] = (val & 0x00FF);
-		}
+		//}
 	} else if (address < 0xC000) {
 		if (ram_enable_) {
 			switchable_ram_bank_[curr_ram_bank_][address-0xA000+1] = (val >> 8) & 0x00FF;
@@ -324,10 +325,10 @@ void MMU::writeWord(WORD address, WORD val) {
 	} else if (address >= 0xFE00 && address < 0xFEA0) {
 		// if STAT register (0xFF41) shows we are in H-Blank or V-Blank
 		// we can write to OAM sprite memory
-		if (!(io_ports_[0x41] & 0x02)) {
+		//if (!(io_ports_[0x41] & 0x02)) {
 			oam_[address-0xFE00+1] = (val >> 8) & 0x00FF;
 			oam_[address-0xFE00] = (val & 0x00FF);
-		}
+		//}
 	} else if (address >= 0xFF00 && address < 0xFF4C) {
 		std::cout << "Writing to I/O registers with WORD, consider changing to BYTE since this fails.\n";
 	} else if (address >= 0xFF80 && address < 0xFFFF) {
@@ -537,6 +538,8 @@ void MMU::renderScreen() {
 
 						for (int b = 0; b < 8; ++b) {
 							BYTE color = ((low1 >> (7-b)) & 0x01) | ((hi1 >> (7-b) << 1) & 0x02);
+							if (oam_[i*4+3] & 0x20)
+								color = ((low1 >> b) & 0x01) | ((hi1 >> b << 1) & 0x02);
 
 							if (color == 0x00){}
 							else if (color == 0x01) 

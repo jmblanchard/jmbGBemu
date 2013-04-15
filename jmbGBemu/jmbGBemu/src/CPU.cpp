@@ -387,9 +387,12 @@ void CPU::ADD_HL_BC(){
 	// did we have a carry?
 	if (sum < hl && sum < bc)
 		F_ |= 0x10;
+	else
+		F_ &= ~(0x10);
+
 	F_ &= ~(0x40); // reset N
 	// not implementing H flag
-	H_ = sum >> 8;
+	H_ = sum >> 8 & 0xFF;
 	L_ = sum & 0xFF;
 
 	cycles_done_ = 8;
@@ -730,7 +733,7 @@ void CPU::LD_H_n(){
 void CPU::DAA(){
 	// I don't care about this opcode, but I will print if a ROM uses
 	// it so I know that I have to use it. I will implement it then.
-	std::cout << "OPCODE DAA() used. MUST IMPLEMENT.\n";
+	//std::cout << "OPCODE DAA() used. MUST IMPLEMENT.\n";
 }
 
 void CPU::JR_Z_n(){
