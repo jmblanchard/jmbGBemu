@@ -17,7 +17,6 @@ Emulator::~Emulator() {
 // Runs emulation, allowing systems to work together
 void Emulator::run() {
 	int cpu_cycle_complete_; // CPU will return number of cycles just run
-	screen = SDL_SetVideoMode(160, 144, 16, SDL_SWSURFACE);
 
 	// SOME TEST STUFF
 	//mmu_->test();
@@ -46,6 +45,8 @@ void Emulator::shutdown() {
 
 // Initializes the emulator
 void Emulator::initialize(std::string filename) {
+	screen = SDL_SetVideoMode(160, 144, 32, SDL_SWSURFACE);
+
     filename_ = filename;
 	hi_ = new HeaderInfo();
 	mmu_ = new MMU(filename_, hi_, this);
@@ -123,6 +124,7 @@ void Emulator::updateClocks(int cycles) {
 			mmu_->updateLY();
 
 			// TO DO: we're going to draw here
+			mmu_->renderScreen();
 
 			spinUntilNextFrame();
 			start_ticks_ = SDL_GetTicks();
@@ -136,6 +138,10 @@ void Emulator::setTimerRunning(bool b) {
 
 void Emulator::setTimerMode(BYTE b) {
 	timer_mode_ = Mode(b);
+}
+
+SDL_Surface *Emulator::getScreen() {
+	return screen;
 }
 
 void Emulator::handleInput() {

@@ -9,6 +9,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstring> // for memcpy
+#include <SDL.h>
 
 #include "definitions.h"
 #include "HeaderInfo.h"
@@ -30,6 +31,8 @@ public:
 	void setLCDCMode(Mode m);
 	void setButtonPressed(Button b);
 	void setButtonReleased(Button b);
+
+	void renderScreen();
 
 	void test(); // will be responsible for testing
 
@@ -94,11 +97,22 @@ private:
 	bool start_pressed_;
 	bool select_pressed_;
 
+	// SDL screen
+	SDL_Surface *screen;
+	Uint32 COLOR_WHITE;
+	Uint32 COLOR_LGREY;
+	Uint32 COLOR_DGREY;
+	Uint32 COLOR_BLACK;
+
+	Uint32 bg_data_[256][256];
+	bool recalc_bg_data_;
+
 	// timer
 	bool timer_running_;
 	BYTE timer_clock_select_;
 
 	void loadROM(std::string filename);
+	void loadBGMapData(int mapSelect, int dataSelect);
 };
 
 #endif

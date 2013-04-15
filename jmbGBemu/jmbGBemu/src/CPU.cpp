@@ -317,6 +317,8 @@ void CPU::INC_B(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ &= ~(0x40); // reset N flag
 	if ((B_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
@@ -331,6 +333,8 @@ void CPU::DEC_B(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ |= 0x40; // set N flag
 	if ((B_&0x0F - 0x01) >= 0x0F)
 		F_ |= 0x20; // half carry flag
@@ -412,6 +416,8 @@ void CPU::INC_C(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ &= ~(0x40); // reset N flag
 	if ((C_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
@@ -426,6 +432,8 @@ void CPU::DEC_C(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ |= 0x40; // set N flag
 	if ((C_&0x0F - 0x01) >= 0x0F)
 		F_ |= 0x20; // half carry flag
@@ -496,6 +504,8 @@ void CPU::INC_D(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ &= ~(0x40); // reset N flag
 	if ((D_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
@@ -510,6 +520,8 @@ void CPU::DEC_D(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ |= 0x40; // set N flag
 	if ((D_&0x0F - 0x01) >= 0x0F)
 		F_ |= 0x20; // half carry flag
@@ -588,6 +600,8 @@ void CPU::INC_E(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ &= ~(0x40); // reset N flag
 	if ((E_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
@@ -602,6 +616,8 @@ void CPU::DEC_E(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ |= 0x40; // set N flag
 	if ((E_&0x0F - 0x01) >= 0x0F)
 		F_ |= 0x20; // half carry flag
@@ -678,6 +694,8 @@ void CPU::INC_H(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ &= ~(0x40); // reset N flag
 	if ((H_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
@@ -692,6 +710,8 @@ void CPU::DEC_H(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ |= 0x40; // set N flag
 	if ((H_&0x0F - 0x01) >= 0x0F)
 		F_ |= 0x20; // half carry flag
@@ -764,6 +784,8 @@ void CPU::INC_L(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ &= ~(0x40); // reset N flag
 	if ((L_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
@@ -778,6 +800,8 @@ void CPU::DEC_L(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ |= 0x40; // set N flag
 	if ((L_&0x0F - 0x01) >= 0x0F)
 		F_ |= 0x20; // half carry flag
@@ -944,6 +968,8 @@ void CPU::INC_A(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ &= ~(0x40); // reset N flag
 	if ((A_&0x0F + 0x01)&0x10)
 		F_ |= 0x20; // half carry flag
@@ -958,6 +984,8 @@ void CPU::DEC_A(){
 
 	if (temp == 0x00)
 		F_ |= 0x80; // set Zero flag
+	else
+		F_ &= ~(0x80);
 	F_ |= 0x40; // set N flag
 	if ((A_&0x0F - 0x01) >= 0x0F)
 		F_ |= 0x20; // half carry flag

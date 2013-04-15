@@ -53,6 +53,17 @@ MMU::MMU(std::string filename, HeaderInfo *hi, Emulator *emu) {
 	b_pressed_ = false;
 	start_pressed_ = false;
 	select_pressed_ = false;
+
+	screen = emu_->getScreen();
+	COLOR_WHITE = SDL_MapRGB(screen->format, 224, 248, 208);
+	COLOR_LGREY = SDL_MapRGB(screen->format, 136, 192, 112);
+	COLOR_DGREY = SDL_MapRGB(screen->format, 52, 104, 86);
+	COLOR_BLACK = SDL_MapRGB(screen->format, 0, 0, 0);
+
+	for (int x = 0; x < 256; ++x)
+		for (int y = 0; y < 256; ++y)
+			bg_data_[x][y] = 0;
+	recalc_bg_data_ = false;
 }
 
 MMU::~MMU() { }
@@ -122,6 +133,7 @@ void MMU::writeByte(WORD address, BYTE val) {
 		// we can write to OAM sprite memory
 		if (!(io_ports_[0x41] & 0x02)) {
 			oam_[address-0xFE00] = val;
+			recalc_bg_data_ = true;
 		}
 	} else if (address >= 0xFF00 && address < 0xFF4C) {
 		// special cases here based on the address to be written.
@@ -136,7 +148,7 @@ void MMU::writeByte(WORD address, BYTE val) {
 			// else If we select P14, we check if any direction keys are pressed
 			// else If we select P15, we check if any button keys are pressed
 			// if any of these buttons are pressed we TOGGLE THE BIT TO 0.
-			if (selectBit == 0x10) {
+			if (selectBit == 0x20) {
 				if (right_pressed_) {
 					build ^= 0x01;
 					std::cout << "Right button pressed.\n";
@@ -153,7 +165,7 @@ void MMU::writeByte(WORD address, BYTE val) {
 					build ^= 0x08;
 					std::cout << "Down button pressed.\n";
 				}
-			} else if (selectBit == 0x20) {
+			} else if (selectBit == 0x10) {
 				if (a_pressed_) {
 					build ^= 0x01;
 					std::cout << "A button pressed.\n";
@@ -193,6 +205,16 @@ void MMU::writeByte(WORD address, BYTE val) {
 			timer_clock_select_ = val & 0x03;
 			emu_->setTimerMode(timer_clock_select_);
 			break;
+		case 0x40: // LCD Control Register - 0xFF40
+			// handle the change of tile data and tile map
+			// display
+			if (((io_ports_[address] & 0x10) != (val & 0x10)) 
+				|| ((io_ports_[address] & 0x08) != (val & 0x08))) {
+				loadBGMapData(val & 0x08, val & 0x10);
+			}
+
+			io_ports_[address] = val;
+			break;
 		case 0x41: // STAT - LCDC status - 0xFF41
 			val = val & 0xF8; // we can only read the bottom 3 bits
 			
@@ -205,6 +227,11 @@ void MMU::writeByte(WORD address, BYTE val) {
 			val |= io_ports_[address]; // make sure we don't clear out mode flag and coincidence flag
 			io_ports_[address] = val;
 			break;
+		case 0x42:
+		case 0x43:
+			recalc_bg_data_ = true;
+			io_ports_[address] = val;
+			break;
 		case 0x44: // LY - LCDC y coord - 0xFF44
 			// THIS IS READ ONLY, CAN'T CHANGE
 			break;
@@ -213,19 +240,19 @@ void MMU::writeByte(WORD address, BYTE val) {
 			// to OAM
 			if (val > 0x00 && val <= 0xF1) {
 				WORD wval = (WORD)val << 8;
-				BYTE src = rom_bank_0_[wval&0x4000];
+				BYTE *src = &rom_bank_0_[wval-0x4000];
 				if (wval < 0x4000) {
 				} else if (wval < 0x8000) {
-					src = switchable_rom_bank_[curr_rom_bank_][wval-0x4000];
+					src = &switchable_rom_bank_[curr_rom_bank_][wval-0x4000];
 				} else if (wval < 0xA000) {
-					src = video_ram_[wval-0x8000];
+					src = &video_ram_[wval-0x8000];
 				} else if (wval < 0xC000) {
-					src = switchable_ram_bank_[curr_ram_bank_][wval-0xA000];
+					src = &switchable_ram_bank_[curr_ram_bank_][wval-0xA000];
 				} else if (wval < 0xE000) {
-					src = internal_ram_[wval-0xC000];
+					src = &internal_ram_[wval-0xC000];
 				}
 
-				memcpy(oam_, &src, 0x9F);
+				memcpy(oam_, src, 0x9F);
 			}
 
 			break;
@@ -265,10 +292,21 @@ void MMU::readWord(WORD address, WORD &dest) {
 }
 
 void MMU::writeWord(WORD address, WORD val) {
-	if (address < 0x4000) {
-		std::cout << "Writing to ROM with WORD, consider changing to BYTE since this fails.\n";
+	if (address < 0x2000) {
+		if ((val & 0xFF) == 0x0000)
+			ram_enable_ = false;
+		else if ((val & 0x0A) == 0x000A)
+			ram_enable_ = true;
+	} else if (address < 0x4000) {
+		if (num_rom_banks_ > 2) {
+			// writing into ROM location 2000-3FFF will choose the
+			// ROM bank to be used in the switchable ROM bank location.
+			if (val & 0)
+				val |= 1;
+
+			curr_rom_bank_ = (val & 0x1F) - 1;
+		}
 	} else if (address < 0x8000) {
-		std::cout << "Writing to ROM with WORD, consider changing to BYTE since this fails.\n";
 	} else if (address < 0xA000) {
 		// Can only write to video RAM in modes 0-2
 		if ((io_ports_[0x41] & 0x03) != 0x03) {
@@ -430,6 +468,107 @@ void MMU::setButtonReleased(Button b) {
 	}
 }
 
+void MMU::renderScreen() {
+	// draw background
+	if (recalc_bg_data_) {
+		loadBGMapData(io_ports_[0x40] & 0x08, io_ports_[0x40] & 0x10);
+
+		// draw sprites
+		if (io_ports_[0x40] & 0x02) {
+			if (io_ports_[0x40] & 0x04) {
+				// 8x16 sprite mode
+
+				for (int i = 0; i < 40; ++i) {
+					if (oam_[i*4] <= 0 || oam_[i*4] >= 160)
+						continue;
+
+					WORD offset1 = oam_[i*4+2]*0x10;
+					WORD offset2 = (oam_[i*4+2]+0x01)*0x10;
+
+					for (int a = 0; a < 8; ++a) {
+						BYTE c, d;
+						c = io_ports_[0x43];
+						d = io_ports_[0x42];
+						BYTE low1 = video_ram_[offset1];
+						BYTE hi1 = video_ram_[offset1+1];
+						BYTE low2 = video_ram_[offset2];
+						BYTE hi2 = video_ram_[offset2+1];
+
+						for (int b = 0; b < 8; ++b) {
+							BYTE color = ((low1 >> (7-b)) & 0x01) | ((hi1 >> (7-b) << 1) & 0x02);
+							BYTE color2 = ((low2 >> (7-b)) & 0x01) | ((hi2 >> (7-b) << 1) & 0x02);
+
+							if (color == 0x00){}
+							else if (color == 0x01) 
+								bg_data_[(d+oam_[i*4]+a-16)%256][(c+oam_[i*4+1]+b-8)%256] = COLOR_LGREY;
+							else if (color == 0x02) 
+								bg_data_[(d+oam_[i*4]+a-16)%256][(c+oam_[i*4+1]+b-8)%256] = COLOR_DGREY;
+							else if (color == 0x03)
+								bg_data_[(d+oam_[i*4]+a-16)%256][(c+oam_[i*4+1]+b-8)%256] = COLOR_BLACK;
+
+							if (color2 == 0x00) {}
+							else if (color2 == 0x01)
+								bg_data_[(d+oam_[i*4]+a-8)%256][(c+oam_[i*4+1]+b-8)%256] = COLOR_LGREY;
+							else if (color2 == 0x02)
+								bg_data_[(d+oam_[i*4]+a-8)%256][(c+oam_[i*4+1]+b-8)%256] = COLOR_DGREY;
+							else if (color2 == 0x03)
+								bg_data_[(d+oam_[i*4]+a-8)%256][(c+oam_[i*4+1]+b-8)%256] = COLOR_BLACK;
+						}
+						offset1 += 2;
+						offset2 += 2;
+					}
+				}
+			} else {
+				// 8x8 sprite mode
+				
+				// loop through sprites
+				for (int i = 0; i < 40; ++i) {
+					if (oam_[i*4] <= 0 || oam_[i*4] >= 160)
+						continue;
+
+					WORD offset1 = oam_[i*4+2]*0x10;
+
+					for (int a = 0; a < 8; ++a) {
+						BYTE c, d;
+						c = io_ports_[0x43];
+						d = io_ports_[0x42];
+						BYTE low1 = video_ram_[offset1];
+						BYTE hi1 = video_ram_[offset1+1];
+
+						for (int b = 0; b < 8; ++b) {
+							BYTE color = ((low1 >> (7-b)) & 0x01) | ((hi1 >> (7-b) << 1) & 0x02);
+
+							if (color == 0x00){}
+							else if (color == 0x01) 
+								bg_data_[(d+oam_[i*4]+a-16)%256][(c+oam_[i*4+1]+b-8)%256] = COLOR_LGREY;
+							else if (color == 0x02) 
+								bg_data_[(d+oam_[i*4]+a-16)%256][(c+oam_[i*4+1]+b-8)%256] = COLOR_DGREY;
+							else if (color == 0x03)
+								bg_data_[(d+oam_[i*4]+a-16)%256][(c+oam_[i*4+1]+b-8)%256] = COLOR_BLACK;
+						}
+						offset1 += 2;
+					}
+				}
+			}
+
+			int x_pos, y_pos;
+			y_pos = io_ports_[0x42];
+			x_pos = io_ports_[0x43];
+			for (int i = 0; i < 160; ++i) {
+				for (int j = 0; j < 144; ++j) {
+					Uint32 *p = (Uint32 *)screen->pixels + j*screen->pitch/4 + i;
+
+					*p = bg_data_[(j+y_pos)%256][(i+x_pos)%256];
+				}
+			}
+		}
+
+		recalc_bg_data_ = false;
+	}
+
+	SDL_UpdateRect(screen, 0, 0, 0, 0);
+}
+
 void MMU::loadROM(std::string filename) {
 	std::cout << "Filename: " << filename << "\n";
 	std::ifstream file(filename, std::ios::binary);
@@ -469,6 +608,48 @@ void MMU::loadROM(std::string filename) {
 
 	} else {
 		std::cout << "Failed to open ROM file.\n";
+	}
+}
+
+void MMU::loadBGMapData(int mapSelect, int dataSelect) {
+	WORD map_address = mapSelect ? 0x1C00 : 0x1800;
+	WORD data_address = dataSelect ? 0x0000 : 0x1000;
+
+	for (int i = 0; i < 32; ++i) {
+		for (int j = 0; j < 32; ++j) {
+			// we find out  the data offset
+			WORD offset = map_address + (i*32 + j);
+			BYTE data_id = video_ram_[offset];
+			WORD data_offset;
+
+			// data offset could be signed or unsigned, handle here
+			if (!data_address) {
+				data_offset = data_address + (uint16_t)data_id*16;
+			} else {
+				data_offset = data_address + (int16_t)data_id*16;
+			}
+
+			// transfer data from memory to our bg_data_ structure and
+			// choose correct color
+			for (int a = 0; a < 8; ++a) {
+				BYTE low = video_ram_[data_offset];
+				BYTE hi = video_ram_[data_offset+1];
+
+				for (int b = 0; b < 8; ++b) {
+					BYTE color = ((low >> (7-b)) & 0x01) | ((hi >> (7-b) << 1) & 0x02);
+
+					if (color == 0x00)
+						bg_data_[i*8+a][j*8+b] = COLOR_WHITE;
+					else if (color == 0x01)
+						bg_data_[i*8+a][j*8+b] = COLOR_LGREY;
+					else if (color == 0x02)
+						bg_data_[i*8+a][j*8+b] = COLOR_DGREY;
+					else if (color == 0x03)
+						bg_data_[i*8+a][j*8+b] = COLOR_BLACK;
+				}
+				data_offset += 2;
+			}
+		}
 	}
 }
 

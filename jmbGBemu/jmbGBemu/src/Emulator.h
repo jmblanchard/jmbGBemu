@@ -29,6 +29,8 @@ public:
 	void setTimerRunning(bool b);
 	void setTimerMode(BYTE b);
 
+	SDL_Surface *getScreen();
+
 private:
     std::string filename_;
 	CPU *cpu_;

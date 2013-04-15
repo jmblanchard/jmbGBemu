@@ -6,6 +6,7 @@
 #define _DEFINITIONS_H
 
 #include <cstdint>
+#include <SDL.h>
 
 // forward declarations
 class Emulator;
